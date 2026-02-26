@@ -17,6 +17,10 @@ class LineNumbers(tk.Canvas):
         self.text_widget.bind("<KeyRelease>", self.redraw)
         self.text_widget.bind("<MouseWheel>", self.redraw)
         self.text_widget.bind("<ButtonRelease-1>", self.redraw)
+	self.text_widget.bind("<<Modified>>", self.redraw)
+	self.text_widget.bind("<Return>", self.redraw)
+	self.text_widget.bind("<BackSpace>", self.redraw)
+	self.text_widget.bind("<Delete>", self.redraw)
 
     def redraw(self, event=None):
         """Redibuja los números de linea."""
