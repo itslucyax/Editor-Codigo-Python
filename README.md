@@ -87,5 +87,5 @@ Proyecto interno para uso empresarial.
 
 ## Autoras
 
-- [Nombre Persona A]
-- [Nombre Persona B]
+- Lucia Martin Eslava - itslucyax
+- Naiara Antolin Perez - Naiara-sys
