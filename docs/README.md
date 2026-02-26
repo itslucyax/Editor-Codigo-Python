@@ -1,7 +1,7 @@
 # Editor de Scripts VBS
 
 <p align="center">
-  <img src="docs/images/editor.png" alt="Editor de Scripts VBS" width="800"/>
+  <img src="images/editor.png" alt="Editor de Scripts VBS" width="800"/>
 </p>
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
