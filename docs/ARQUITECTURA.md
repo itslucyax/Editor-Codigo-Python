@@ -2,11 +2,7 @@
 
 ## Visión general
 
-El proyecto sigue una arquitectura modular con separación clara entre:
-
-- **Interfaz de usuario** (Tkinter)
-- **Lógica de negocio** (resaltado de sintaxis)
-- **Acceso a datos** (SQL Server)
+Aplicación de escritorio Python con tres capas bien delimitadas: interfaz gráfica (Tkinter), resaltado de sintaxis (Pygments) y acceso a datos (pyodbc → SQL Server). La comunicación entre capas siempre va de arriba hacia abajo; `db/`no sabe nada de la UI y `syntax/` no sabe nada de la DB.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -29,12 +25,17 @@ El proyecto sigue una arquitectura modular con separación clara entre:
         │  editor  │ │ numbers  │ │ highlight│
         └──────────┘ └──────────┘ └──────────┘
 ```
+---
 
 ## Módulos
 
-### main.py
+### main.py - Bootstrap
 
-**Responsabilidad**: Punto de entrada de la aplicación.
+Punto de entrada. Parsea argumentos con `argparse`, instancia `DatabaseConnection`, carga el script con `get_script()`, lanza `EditorApp` y cierrra la conexión al salir del script `mainloop`. Si faltan parámetros de DB, arranca en modo local con un script de ejemplo hardcodeado.
+
+Si `connect()` o `get_script()` lanzan excepción, termina con `sys.exit(1)` y el error va a stderr.
+
+---
 
 ```python
 # Flujo principal
@@ -53,9 +54,9 @@ El proyecto sigue una arquitectura modular con separación clara entre:
 
 ---
 
-### config.py
+### config.py - Constantes visuales
 
-**Responsabilidad**: Centralizar configuración visual.
+Único punto de configuración para colores y fuente. Todaslas constantes son strings o tuplas importadas directamente por los módulos que las necesitan. Cambiar un color aquí afecta a todos los componentes sin tocar nada más.
 
 ```python
 # Colores del tema oscuro
@@ -74,11 +75,13 @@ FUENTE_EDITOR      = ("Consolas", 12)
 
 ---
 
-### db/connection.py
-
-**Responsabilidad**: Comunicación con SQL Server.
+### db/connection.py - Acceso a datos
 
 **Clase principal**: `DatabaseConnection`
+
+Encapsula la conexión pyodbc y las dos únicas operaciones que necesita el editor: leer y escribir un script. La tabla y la columna de contenido son configurables en tiempo de ejecución vía argumentos CLI.
+
+Usa SQL Authentication (`UID`/`PWD`). No soporta Windows Authentication. La conexión se abre con `autocommit=False`; el commit se hace explícitamente en `save_script()` tras comprobar `rowcount`.
 
 ```python
 class DatabaseConnection:
@@ -89,27 +92,33 @@ class DatabaseConnection:
     def save_script(modelo, codigo, content)  # UPDATE del script
 ```
 
-**Manejo de errores**:
-- `ValueError`: Credenciales faltantes
-- `ConnectionError`: Fallo de conexión
-- `LookupError`: Script/columna no existe
+**Errores que puede lanzar:**
 
-**SQL generado**:
+| Situación | Excepción |
+|-----------|-----------|
+| Faltan `--user` o `--password` | `ValueError` |
+| No se puede conectar al servidor | `ConnectionError` (wrappea `pyodbc.Error`) |
+| Script no encontrado en BD | `LookupError` |
+| Columna `--content-column` no existe | `LookupError` (error ODBC `42S22`) |
+
+**SQL generado** (parámetros tipados, sin concatenación de strings):
+
 ```sql
--- get_script
 SELECT [SCRIPT] FROM [G_SCRIPT] WHERE [MODELO] = ? AND [CODIGO] = ?
-
--- save_script
 UPDATE [G_SCRIPT] SET [SCRIPT] = ? WHERE [MODELO] = ? AND [CODIGO] = ?
 ```
 
 ---
 
-### editor/app.py
+### editor/app.py - Ventana principal
 
-**Responsabilidad**: Ventana principal de la aplicación.
+**Clase principal**: `EditorApp` (`tk.Tk`)
 
-**Clase principal**: `EditorApp` (hereda de `tk.Tk`)
+Monta la ventana, conecta los componentes y gestiona los eventos de alto nivel. No hace queries ni tokeniza; delega en `DatabaseConnection` y `TextEditor`.
+
+Estructura de la ventana:
+- `Frame` principal con `TextEditor` (derecha) y `LineNumbers` (izquierda)  layout `pack`
+- `Label` de barra de estado anclado al fondo (`side="bottom"`)
 
 ```python
 class EditorApp(tk.Tk):
@@ -131,13 +140,31 @@ class EditorApp(tk.Tk):
 - `LineNumbers`: Números de línea
 - `Label`: Barra de estado
 
+Atajos registrados con `bind_all` para que funciones independientemente del foco:
+
+| Atajo | Método |
+|-------|--------|
+| `Ctrl+S` | `_guardar()` |
+| `Ctrl+Z` | `_deshacer()` → `edit_undo()` |
+| `Ctrl+Y` | `_rehacer()` → `edit_redo()` |
+| `Ctrl+A` | `_seleccionar_todo()` |
+
+El cierre se intercepta con `protocol("WM_DELETE_WINDOW", _on_cerrar)`. Si `edit_modified()` devuelve `True`, muestra diálogo `askyesnocancel` antes de destruir la ventana.
+
+La barra de estado se actualiza en `_update_status()`, enlazada a `<<Change>>`, `<KeyRelease>` y `<ButtonRelease-1>`. Muestra origen (`SQL (MODELO/CODIGO)` o `Local`), posición del cursor (`línea.col`) y estado de modificación.
+
 ---
 
-### editor/text_editor.py
-
-**Responsabilidad**: Widget de texto con resaltado.
+### editor/text_editor.py - Área de edición
 
 **Clase principal**: `TextEditor` (hereda de `tk.Text`)
+
+Extiende `tk.Text` con resaltado de sintaxis y un sistema de debounce para no recalcular los tags en cada pulsación.
+
+Configuración del widget:
+- `undo=True` — historial nativo de Tkinter
+- `wrap="none"` — scroll horizontal en lugar de wrap
+- `selectbackground="#264f78"` — selección estilo VS Code
 
 ```python
 class TextEditor(tk.Text):
@@ -159,13 +186,29 @@ class TextEditor(tk.Text):
 - `<<Paste>>`, `<<Cut>>`: Resaltar tras pegar/cortar
 - `<<Undo>>`, `<<Redo>>`: Resaltar tras deshacer/rehacer
 
+
+El resaltado es costoso (tokeniza todo el texto con Pygments). Para no bloquearse en cada tecla hay tres niveles de respuesta:
+
+| Evento | Comportamiento |
+|--------|----------------|
+| `BackSpace`, `Delete`, `Return`, `"`, `'` | Resaltado inmediato (`_do_highlight_now`) |
+| Resto de teclas, `<<Modified>>` | Resaltado diferido 20 ms (`_schedule_highlight_fast`) |
+| `<ButtonRelease-1>` | Resaltado diferido 50 ms (`_schedule_highlight`) |
+| `<<Paste>>`, `<<Cut>>`, `<<Undo>>`, `<<Redo>>` | Resaltado inmediato |
+
+Cada llamada a `_schedule_highlight*` cancela el `after` pendiente antes de programar uno nuevo, garantizando que solo haya un resaltado en cola a la vez.
+
+Tras cada resaltado se emite `<<Change>>` para que `LineNumbers` y la barra de estado se actualicen.
+
 ---
 
-### editor/line_numbers.py
-
-**Responsabilidad**: Mostrar números de línea sincronizados.
+### editor/line_numbers.py - Números de línea
 
 **Clase principal**: `LineNumbers` (hereda de `tk.Canvas`)
+
+Canvas de 40 px de ancho. `redraw()` recorre las líneas visibles usando `dlineinfo()` — que devuelve la posición Y real en pantalla — y dibuja el número con `create_text`. Esto hace que funcione correctamente con scroll sin necesidad de cálculos manuales de offset.
+
+Se suscribe a `<<Change>>`, `<Configure>`, `<KeyRelease>`, `<MouseWheel>`, `<ButtonRelease-1>`, `<Return>`, `<BackSpace>` y `<Delete>` del `TextEditor` para mantenerse sincronizado.
 
 ```python
 class LineNumbers(tk.Canvas):
@@ -177,11 +220,11 @@ class LineNumbers(tk.Canvas):
 
 ---
 
-### editor/syntax/vb_highlighter.py
-
-**Responsabilidad**: Aplicar colores al código VBScript.
+### editor/syntax/vb_highlighter.py - Resaltado
 
 **Clase principal**: `VBHighlighter`
+
+Usa `VBScriptLexer` de Pygments para tokenizar y mapea cada tipo de token a un tag de Tkinter. Los tags se configuran en `__init__` con los colores de `config.py`; en cada llamada a `highlight()` se limpian todos los tags y se vuelven a aplicar.
 
 ```python
 class VBHighlighter:
@@ -202,30 +245,39 @@ class VBHighlighter:
    - Aplicar tag al rango de texto
 ```
 
-**Tags definidos**:
-| Tag | Token Pygments | Color |
-|-----|----------------|-------|
-| keyword | Token.Keyword | Azul |
-| string | Token.Literal.String | Naranja |
-| comment | Token.Comment | Verde |
-| number | Token.Literal.Number | Verde claro |
-| builtin | Token.Name.Builtin | Amarillo |
+**Mapeo de tokens:**
+
+| Tag Tkinter | Token Pygments | Notas |
+|-------------|----------------|-------|
+| `keyword` | `Token.Keyword` | `If`, `Sub`, `Function`, etc. |
+| `string` | `Token.Literal.String` | |
+| `comment` | `Token.Comment` | Fuente itálica |
+| `number` | `Token.Literal.Number` | |
+| `builtin` | `Token.Name.Builtin` | `MsgBox`, `InputBox`, etc. |
+| `function` | `Token.Name.Function` | Nombres de funciones definidas |
+| `class` | `Token.Name.Class`, `Token.Name.Type` | |
+| `variable` | `Token.Name.Variable`, `Token.Name.Attribute`, `Token.Name` (fallback) | |
+| `constant` | `Token.Name.Constant` | |
+| `operator` | `Token.Operator` | |
+
+El cálculo de posiciones se hace en coordenadas `línea.columna` en lugar de offsets absolutos. El motivo es que los offsets fallan con caracteres multibyte y con saltos de línea CRLF — calcular `línea.columna` iterando carácter a carácter es más lento pero correcto.
 
 ---
 
-## Flujo de datos
+## Flujos principales
 
-### Al abrir
+### Apertura
 
 ```
-CLI args → main.py → DatabaseConnection.connect()
-                   → DatabaseConnection.get_script()
+CLI args → main.py → DatabaseConnection.connect()    # pyodbc abre conexión
+                   → DatabaseConnection.get_script() # SELECT, normaliza CRLF→LF
                    → EditorApp(contenido)
-                   → TextEditor.set_content()
-                   → VBHighlighter.highlight()
+                   → TextEditor.set_content()  # strip \n + insert
+                   → VBHighlighter.highlight() # primer pintado
+                   → LineNumbers.redraw()      # primer dibujado
 ```
 
-### Al guardar (Ctrl+S)
+### Guardado (Ctrl+S)
 
 ```
 Usuario pulsa Ctrl+S
@@ -236,7 +288,7 @@ Usuario pulsa Ctrl+S
     → Actualizar barra de estado
 ```
 
-### Al cerrar
+### Cierre con cambios pendientes
 
 ```
 Usuario cierra ventana
@@ -245,7 +297,7 @@ Usuario cierra ventana
         → Sí: Mostrar diálogo
             → "Sí": _guardar() + destroy()
             → "No": destroy()
-            → "Cancelar": return
+            → "Cancelar": return (no cierra)
         → No: destroy()
 ```
 
@@ -279,3 +331,13 @@ Usuario cierra ventana
 ### ¿Por qué posiciones línea.columna?
 
 Inicialmente usamos offsets (`1.0+Nc`), pero fallaba con caracteres especiales y CRLF. Calcular posición `línea.columna` manualmente es más robusto.
+
+## Dependencias
+
+| Librería | Versión mínima | Uso |
+|----------|----------------|-----|
+| `tkinter` | Python stdlib | GUI completa |
+| `pygments` | ≥ 2.0 | Tokenización VBScript |
+| `pyodbc` | ≥ 4.0 | Conexión SQL Server |
+
+Driver ODBC requerido en el sistema: `ODBC Driver 17` o `18 for SQL Server` (configurable con `--driver`).
