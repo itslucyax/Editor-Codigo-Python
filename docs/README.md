@@ -1,5 +1,14 @@
 # Editor de Scripts VBS
 
+<p align="center">
+  <img src="docs/images/editor.png" alt="Editor de Scripts VBS" width="800"/>
+</p>
+
+![Python](https://img.shields.io/badge/Python-3.10+-blue)
+![Platform](https://img.shields.io/badge/Platform-Windows-0078D6)
+![Database](https://img.shields.io/badge/SQL%20Server-ODBC-red)
+![Status](https://img.shields.io/badge/Status-Production-green)
+
 Editor de scripts VBScript con resaltado de sintaxis estilo VS Code y conexión a SQL Server.
 
 ## Descripción
@@ -87,5 +96,5 @@ Proyecto interno para uso empresarial.
 
 ## Autoras
 
-- [Nombre Persona A]
-- [Nombre Persona B]
+- [Lucía Martín Eslava]
+- [Naiara Antolín Pérez]
