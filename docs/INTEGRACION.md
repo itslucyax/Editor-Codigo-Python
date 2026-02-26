@@ -6,10 +6,12 @@ Esta guía explica cómo integrar el editor de scripts con la aplicación de esc
 
 El editor se lanza mediante línea de comandos. La aplicación de escritorio debe ejecutar el EXE pasando los parámetros del script a editar.
 
+El editor actua, por tanto, como un "editor especializado conectado a la base de datos", funcionando como una extensión externa de la aplicación principal.
+
 ## Parámetros CLI
 
 | Parámetro | Obligatorio | Descripción | Ejemplo |
-|-----------|-------------|-------------|---------|
+
 | `--server` | Sí | Servidor SQL Server | `"servidor\instancia"` |
 | `--database` | Sí | Base de datos | `"MIBD"` |
 | `--modelo` | Sí | Valor columna MODELO | `"T01"` |
@@ -131,7 +133,7 @@ GRANT SELECT, UPDATE ON dbo.G_SCRIPT TO editor_script;
 
 ### Verificar funcionamiento
 
-1. ✅ Se abre el editor con el script
-2. ✅ Los colores se muestran correctamente
-3. ✅ Ctrl+S guarda en BD
-4. ✅ Al cerrar con cambios, pregunta si guardar
+1.  Se abre el editor con el script
+2.  Los colores se muestran correctamente
+3.  Ctrl+S guarda en BD
+4.  Al cerrar con cambios, pregunta si guardar
