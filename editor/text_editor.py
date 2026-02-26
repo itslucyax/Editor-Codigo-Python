@@ -77,11 +77,12 @@ class TextEditor(tk.Text):
     def _do_highlight(self):
         """Ejecuta el resaltado ya con el texto estable."""
         self._highlight_after_id = None
-        code = self.get("1.0", "end-1c")
-        self.highlighter.highlight(code)
+        self.highlighter.highlight()
         self.event_generate("<<Change>>")
 
     def set_content(self, text: str):
+        # Strip newlines iniciales/finales que causan desfase en el highlighter
+        text = text.strip('\n')
         self.delete("1.0", "end")
         self.insert("1.0", text)
         self._do_highlight()  # Highlight inmediato al cargar contenido

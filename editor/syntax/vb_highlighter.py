@@ -6,7 +6,7 @@ Estilo VS Code con diferenciacion de colores mejorada.
 from __future__ import annotations
 
 from pygments import lex
-from pygments.lexers import VbNetLexer
+from pygments.lexers.basic import VBScriptLexer
 from pygments.token import Token
 from config import (
     COLOR_KEYWORD,
@@ -99,7 +99,8 @@ class VBHighlighter:
     
     def __init__(self, text_widget):
         self.text_widget = text_widget
-        self.lexer = VbNetLexer()
+        # Usar VBScriptLexer para mejor compatibilidad con código VBS
+        self.lexer = VBScriptLexer()
         
         # Definir los tags de colores con estilo VS Code
         self.text_widget.tag_configure("keyword", foreground=COLOR_KEYWORD)
@@ -115,31 +116,45 @@ class VBHighlighter:
         self.text_widget.tag_configure("punctuation", foreground=COLOR_PUNCTUATION)
         self.text_widget.tag_configure("normal", foreground=COLOR_TEXTO)
 
-    def highlight(self, code: str) -> None:
+    def highlight(self, code: str = None) -> None:
         """
-        Tokeniza `code` y aplica tags en el Text widget.
-        Importante: se aplica por offset (posicion), NO con busquedas de texto.
+        Tokeniza el contenido actual del widget y aplica tags.
+        Usa posiciones linea.columna para evitar problemas con offsets.
         """
         # Quitar TODOS los tags anteriores primero
         for tag in self.TAGS:
             self.text_widget.tag_remove(tag, "1.0", "end")
 
-        # Cursor logico dentro del string code
-        offset = 0
+        # Obtener el texto directamente del widget para evitar discrepancias
+        text = self.text_widget.get("1.0", "end-1c")
+        
+        if not text:
+            return
 
-        for token, content in lex(code, self.lexer):
+        # Posicion actual: linea (1-based), columna (0-based)
+        line = 1
+        col = 0
+
+        for token, content in lex(text, self.lexer):
             if not content:
                 continue
 
-            start_offset = offset
-            end_offset = offset + len(content)
-            offset = end_offset
-
             tag = _token_to_tag(token)
-
-            # Convertir offsets a indices Tkinter: "1.0 + Nc"
-            start_index = f"1.0+{start_offset}c"
-            end_index = f"1.0+{end_offset}c"
+            
+            # Calcular posicion inicial
+            start_index = f"{line}.{col}"
+            
+            # Avanzar por el contenido del token
+            for char in content:
+                if char == '\n':
+                    line += 1
+                    col = 0
+                else:
+                    col += 1
+            
+            # Posicion final
+            end_index = f"{line}.{col}"
+            
             self.text_widget.tag_add(tag, start_index, end_index)
         
         # Asegurar que los tags de sintaxis tienen prioridad sobre normal
