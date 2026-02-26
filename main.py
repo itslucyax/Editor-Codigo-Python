@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Punto de entrada del editor: analiza argumentos y lanza la interfaz.
 """

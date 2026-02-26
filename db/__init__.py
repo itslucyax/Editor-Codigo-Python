@@ -1,1 +1,2 @@
-# Archivo de inicialización del módulo db
+# -*- coding: utf-8 -*-
+# Archivo de inicializacion del modulo db

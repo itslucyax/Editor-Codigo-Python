@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 """
-Clase para conectar a SQL Server — se implementará en Fase 2.
+Clase para conectar a SQL Server - se implementara en Fase 2.
 """
 
 class DatabaseConnection:

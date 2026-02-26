@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Ventana principal del editor usando Tkinter, integra editor y numeros de linea.
 """
@@ -49,7 +50,8 @@ class EditorApp(tk.Tk):
 
     def _update_status(self, event=None):
         linea, columna = self.text_editor.index("insert").split(".")
-        self.status_var.set(f"Linea: {linea}  Col: {int(columna)+1}  |  VBScript  |  {'✅' if self.text_editor.edit_modified() else ' '}")
+        modificado = "*" if self.text_editor.edit_modified() else ""
+        self.status_var.set(f"Linea: {linea}  Col: {int(columna)+1}  |  VBScript {modificado}")
 
     def _guardar(self, event=None):
         # Solo muestra mensaje ficticio

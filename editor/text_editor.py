@@ -1,10 +1,12 @@
+# -*- coding: utf-8 -*-
 """
-Editor principal con soporte para resaltado de sintaxis y funcionalidades de edición.
+Editor principal con soporte para resaltado de sintaxis y funcionalidades de edicion.
 """
 
 import tkinter as tk
 from editor.syntax.vb_highlighter import VBHighlighter
 from config import COLOR_FONDO, COLOR_TEXTO, FUENTE_EDITOR
+
 
 class TextEditor(tk.Text):
     """
@@ -18,37 +20,68 @@ class TextEditor(tk.Text):
             fg=COLOR_TEXTO,
             font=FUENTE_EDITOR,
             insertbackground="white",
-            selectbackground="#264f78",  # Selección tipo VS Code
-            tabs=("1c"),
-            spacing3=4,                 # Espaciado entre líneas
-            wrap="none",                # Sin wrap
+            selectbackground="#264f78",  # Seleccion tipo VS Code
+            wrap="none",                 # Sin wrap
             **kwargs
         )
 
         self.highlighter = VBHighlighter(self)
 
-        # Binds principales para refrescar resaltado/estado
-        self.bind("<KeyRelease>", self._highlight_event)
-        self.bind("<ButtonRelease-1>", self._highlight_event)
+        # Debounce: id del after pendiente
+        self._highlight_after_id = None
 
-        # Binds extra para asegurar que se redibujan números de línea en acciones clave
-        for key in ["<Return>", "<BackSpace>", "<Delete>"]:
-            self.bind(key, self._trigger_line_update)
+        # Eventos que cambian contenido - capturamos todos los posibles
+        self.bind("<KeyRelease>", self._on_key_release)
+        self.bind("<Key>", self._schedule_highlight_fast)
+        self.bind("<ButtonRelease-1>", self._schedule_highlight)
+        self.bind("<<Paste>>", self._do_highlight_now)
+        self.bind("<<Cut>>", self._do_highlight_now)
+        self.bind("<<Undo>>", self._do_highlight_now)
+        self.bind("<<Redo>>", self._do_highlight_now)
+        self.bind("<<Modified>>", self._schedule_highlight_fast)
 
-        self._highlight_event()  # Inicial
+        # Para que numeros de linea / status se actualicen siempre
+        self.bind("<KeyRelease>", lambda e: self.event_generate("<<Change>>"), add=True)
+        self.bind("<MouseWheel>", lambda e: self.event_generate("<<Change>>"), add=True)
 
-    def _trigger_line_update(self, event=None):
-        """Dispara un evento personalizado para que LineNumbers se redibuje."""
-        self.event_generate("<<Change>>")
+        # Primer pintado
+        self._do_highlight()
 
-    def _highlight_event(self, event=None):
+    def _on_key_release(self, event=None):
+        """Maneja el evento de soltar tecla - highlight rapido."""
+        # Teclas que cambian contenido significativamente
+        if event and event.keysym in ('BackSpace', 'Delete', 'Return', 'quotedbl', 'apostrophe'):
+            self._do_highlight_now()
+        else:
+            self._schedule_highlight_fast()
+
+    def _schedule_highlight_fast(self, event=None):
+        """Programa el resaltado con retraso minimo (20ms)."""
+        if self._highlight_after_id is not None:
+            self.after_cancel(self._highlight_after_id)
+        self._highlight_after_id = self.after(20, self._do_highlight)
+
+    def _schedule_highlight(self, event=None):
+        """Programa el resaltado con un pequeno retraso para evitar repintar en cada tecla."""
+        if self._highlight_after_id is not None:
+            self.after_cancel(self._highlight_after_id)
+        self._highlight_after_id = self.after(50, self._do_highlight)
+
+    def _do_highlight_now(self, event=None):
+        """Ejecuta el resaltado inmediatamente sin espera."""
+        if self._highlight_after_id is not None:
+            self.after_cancel(self._highlight_after_id)
+            self._highlight_after_id = None
+        self._do_highlight()
+
+    def _do_highlight(self):
+        """Ejecuta el resaltado ya con el texto estable."""
+        self._highlight_after_id = None
         code = self.get("1.0", "end-1c")
         self.highlighter.highlight(code)
-
-        # Disparar evento para LineNumbers / barra de estado
         self.event_generate("<<Change>>")
 
-    def set_content(self, text):
+    def set_content(self, text: str):
         self.delete("1.0", "end")
         self.insert("1.0", text)
-        self._highlight_event()
+        self._do_highlight()  # Highlight inmediato al cargar contenido

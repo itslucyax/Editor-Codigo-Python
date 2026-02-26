@@ -1,1 +1,2 @@
-# Inicializador del módulo syntax
+# -*- coding: utf-8 -*-
+# Inicializador del modulo syntax

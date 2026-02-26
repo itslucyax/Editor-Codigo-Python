@@ -1,1 +1,2 @@
-# Archivo de inicialización del módulo editor
+# -*- coding: utf-8 -*-
+# Archivo de inicializacion del modulo editor
