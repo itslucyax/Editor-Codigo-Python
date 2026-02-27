@@ -5,63 +5,102 @@ Incluye confirmación al cerrar si hay cambios sin guardar.
 """
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 
-from config import COLOR_FONDO, COLOR_BARRA_ESTADO_BG, COLOR_BARRA_ESTADO_FG, FUENTE_EDITOR
+from config import (
+    COLOR_FONDO,
+    COLOR_BARRA_ESTADO_BG,
+    COLOR_BARRA_ESTADO_FG,
+    COLOR_SEPARADOR,
+    SEPARADOR_ANCHO,
+    FUENTE_EDITOR,
+)
 from editor.text_editor import TextEditor
 from editor.line_numbers import LineNumbers
-
+from editor.sidebar import Sidebar
+from editor.search_bar import SearchBar
 
 class EditorApp(tk.Tk):
     """
-    Ventana principal del editor de scripts.
+    Ventana principal del editor de scripts - DINÁMICA.
     
     Args:
         inicial_text: Contenido inicial del editor
         db: Conexión a base de datos (DatabaseConnection o None)
-        modelo: Valor MODELO del script (para guardar)
-        codigo: Valor CODIGO del script (para guardar)
+        record: Diccionario completo con todos los campos del registro
+        key_columns: Lista de nombres de columnas que son clave primaria
+        content_column: Nombre de la columna que contiene el script
+        editable_columns: Lista de nombres de columnas editables
     """
     
-    def __init__(self, inicial_text="", db=None, modelo=None, codigo=None):
+    def __init__(
+        self, 
+        inicial_text="", 
+        db=None, 
+        record=None,
+        key_columns=None,
+        content_column="SCRIPT",
+        editable_columns=None
+    ):
         super().__init__()
         self.db = db
-        self.modelo = modelo
-        self.codigo = codigo
+        self.record = record or {}
+        self.key_columns = key_columns or []
+        self.content_column = content_column
+        self.editable_columns = editable_columns or []
         
-        # Título de ventana
-        if modelo and codigo:
-            self.title(f"Editor VBS - {modelo}/{codigo}")
+        # Título de ventana dinámico
+        if self.key_columns and self.record:
+            key_display = " / ".join(str(self.record.get(k, "")) for k in self.key_columns)
+            self.title(f"Editor VBS - {key_display}")
         else:
             self.title("Editor VBS - Local")
         
         self.configure(bg=COLOR_FONDO)
-        self.geometry("900x600")
-        self.minsize(600, 400)
+        self.geometry("1100x650")
+        self.minsize(700, 450)
+
+        # Barra de estado inferior (se empaqueta primero para que quede debajo)
+        self.status_var = tk.StringVar()
+        self.status_bar = tk.Label(
+            self, textvariable=self.status_var, bg=COLOR_BARRA_ESTADO_BG,
+            fg=COLOR_BARRA_ESTADO_FG, anchor="w", font=("Segoe UI", 10), padx=8,
+        )
+        self.status_bar.pack(side="bottom", fill="x")
 
         # Frame principal
         frame = tk.Frame(self, bg=COLOR_FONDO)
         frame.pack(fill="both", expand=True)
 
-        # Editor de texto
-        self.text_editor = TextEditor(frame)
-        self.text_editor.pack(side="right", fill="both", expand=True)
+        # 1) Sidebar a la izquierda del todo - DINÁMICO
+        self.sidebar = Sidebar(
+            frame,
+            record=self.record,
+            key_columns=self.key_columns,
+            content_column=self.content_column,
+            editable_columns=self.editable_columns
+        )
+        self.sidebar.pack(side="left", fill="y")
 
-        # Números de línea
+        # 2) Separador visual entre sidebar y números de línea
+        tk.Frame(frame, width=SEPARADOR_ANCHO, bg=COLOR_SEPARADOR).pack(side="left", fill="y", padx=5)
+
+        # 3) Editor de texto (se crea antes que line_numbers porque este lo necesita)
+        self.text_editor = TextEditor(frame)
+
+        # 4) Números de línea en medio (entre sidebar y editor)
         self.line_numbers = LineNumbers(frame, self.text_editor)
         self.line_numbers.pack(side="left", fill="y")
 
-        # Barra de estado inferior
-        self.status_var = tk.StringVar()
-        self.status_bar = tk.Label(
-            self, textvariable=self.status_var, bg=COLOR_BARRA_ESTADO_BG,
-            fg=COLOR_BARRA_ESTADO_FG, anchor="w", font=("Segoe UI", 10)
-        )
-        self.status_bar.pack(side="bottom", fill="x")
+        # 5) Editor a la derecha
+        self.text_editor.pack(side="right", fill="both", expand=True)
+
+        # 6) Barra de búsqueda/reemplazo (flotante sobre el editor)
+        self.search_bar = SearchBar(self.text_editor, self.text_editor)
 
         # Eventos para actualizar status
-        self.text_editor.bind("<<Change>>", self._update_status)
-        self.text_editor.bind("<KeyRelease>", self._update_status)
+        self.text_editor.bind("<<Change>>",        self._update_status)
+        self.text_editor.bind("<KeyRelease>",      self._update_status)
         self.text_editor.bind("<ButtonRelease-1>", self._update_status)
 
         # Cargar contenido inicial
@@ -72,14 +111,20 @@ class EditorApp(tk.Tk):
         self.bind_all("<Control-a>", self._seleccionar_todo)
         self.bind_all("<Control-z>", self._deshacer)
         self.bind_all("<Control-y>", self._rehacer)
+        self.bind_all("<Control-f>", self._abrir_buscar)
+        self.bind_all("<Control-h>", self._abrir_reemplazar)
+        self.bind_all("<Control-g>", self._ir_a_linea)
+        self.bind_all("<F3>", self._buscar_siguiente)
+        self.bind_all("<Shift-F3>", self._buscar_anterior)
         
         # Interceptar cierre de ventana para confirmar si hay cambios
         self.protocol("WM_DELETE_WINDOW", self._on_cerrar)
 
     def _get_origen_label(self) -> str:
         """Devuelve etiqueta para la barra de estado."""
-        if self.db and self.modelo and self.codigo:
-            return f"SQL ({self.modelo}/{self.codigo})"
+        if self.db and self.key_columns and self.record:
+            key_display = "/".join(str(self.record.get(k, "")) for k in self.key_columns)
+            return f"SQL ({key_display})"
         return "Local"
 
     def _update_status(self, event=None):
@@ -92,16 +137,28 @@ class EditorApp(tk.Tk):
         )
 
     def _guardar(self, event=None):
-        """Guarda el script en BD si hay conexión, si no simula guardado."""
-        if self.db and self.modelo and self.codigo:
+        """Guarda el script y campos editados en BD si hay conexión."""
+        if self.db and self.key_columns and self.record:
+            # Obtener contenido del script
             contenido = self.text_editor.get("1.0", "end-1c")
+            
+            # Obtener campos editados del sidebar
+            campos_editados = self.sidebar.get_edited_fields()
+            
+            # Agregar contenido del script a los campos actualizados
+            campos_editados[self.content_column] = contenido
+            
+            # Obtener valores de las claves
+            key_values = [str(self.record.get(k, "")) for k in self.key_columns]
+            
             try:
-                ok = self.db.save_script(self.modelo, self.codigo, contenido)
+                ok = self.db.save_record_full(self.key_columns, key_values, campos_editados)
                 if not ok:
+                    key_display = ", ".join(f"{k}={v}" for k, v in zip(self.key_columns, key_values))
                     messagebox.showwarning(
                         "Guardar", 
                         f"No se actualizó ninguna fila.\n"
-                        f"Revisa que exista MODELO='{self.modelo}' CODIGO='{self.codigo}'"
+                        f"Revisa que exista el registro con {key_display}"
                     )
                 else:
                     self.text_editor.edit_modified(False)
@@ -156,4 +213,46 @@ class EditorApp(tk.Tk):
             self.text_editor.edit_redo()
         except tk.TclError:
             pass
+        return "break"
+
+    # ------------------------------------------------------------------
+    # Búsqueda / Reemplazo / Ir a línea
+    # ------------------------------------------------------------------
+
+    def _abrir_buscar(self, event=None):
+        """Abre la barra de búsqueda (Ctrl+F)."""
+        self.search_bar.show(replace=False)
+        return "break"
+
+    def _abrir_reemplazar(self, event=None):
+        """Abre la barra de búsqueda con reemplazo (Ctrl+H)."""
+        self.search_bar.show(replace=True)
+        return "break"
+
+    def _buscar_siguiente(self, event=None):
+        """Buscar siguiente (F3)."""
+        if self.search_bar.visible:
+            self.search_bar.find_next()
+        return "break"
+
+    def _buscar_anterior(self, event=None):
+        """Buscar anterior (Shift+F3)."""
+        if self.search_bar.visible:
+            self.search_bar.find_prev()
+        return "break"
+
+    def _ir_a_linea(self, event=None):
+        """Diálogo 'Ir a línea' (Ctrl+G)."""
+        total = int(self.text_editor.index("end-1c").split(".")[0])
+        linea = simpledialog.askinteger(
+            "Ir a línea",
+            f"Número de línea (1-{total}):",
+            parent=self,
+            minvalue=1,
+            maxvalue=total,
+        )
+        if linea is not None:
+            self.text_editor.mark_set("insert", f"{linea}.0")
+            self.text_editor.see(f"{linea}.0")
+            self.text_editor.focus_set()
         return "break"

@@ -5,7 +5,7 @@ Editor principal con soporte para resaltado de sintaxis y funcionalidades de edi
 
 import tkinter as tk
 from editor.syntax.vb_highlighter import VBHighlighter
-from config import COLOR_FONDO, COLOR_TEXTO, FUENTE_EDITOR
+from config import COLOR_FONDO, COLOR_TEXTO, COLOR_CURSOR, COLOR_SELECCION, FUENTE_EDITOR
 
 
 class TextEditor(tk.Text):
@@ -19,8 +19,8 @@ class TextEditor(tk.Text):
             bg=COLOR_FONDO,
             fg=COLOR_TEXTO,
             font=FUENTE_EDITOR,
-            insertbackground="white",
-            selectbackground="#264f78",  # Seleccion tipo VS Code
+            insertbackground=COLOR_CURSOR,
+            selectbackground=COLOR_SELECCION,
             wrap="none",                 # Sin wrap
             **kwargs
         )
@@ -85,4 +85,3 @@ class TextEditor(tk.Text):
         text = text.strip('\n')
         self.delete("1.0", "end")
         self.insert("1.0", text)
-        self._do_highlight()  # Highlight inmediato al cargar contenido

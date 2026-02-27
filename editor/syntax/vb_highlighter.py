@@ -21,6 +21,7 @@ from config import (
     COLOR_CONSTANT,
     COLOR_PUNCTUATION,
     COLOR_OPERADOR,
+    FUENTE_EDITOR,
 )
 
 
@@ -105,7 +106,7 @@ class VBHighlighter:
         # Definir los tags de colores con estilo VS Code
         self.text_widget.tag_configure("keyword", foreground=COLOR_KEYWORD)
         self.text_widget.tag_configure("string", foreground=COLOR_STRING)
-        self.text_widget.tag_configure("comment", foreground=COLOR_COMMENT, font=("Consolas", 12, "italic"))
+        self.text_widget.tag_configure("comment", foreground=COLOR_COMMENT, font=(FUENTE_EDITOR[0], FUENTE_EDITOR[1], "italic"))
         self.text_widget.tag_configure("number", foreground=COLOR_NUMBER)
         self.text_widget.tag_configure("builtin", foreground=COLOR_BUILTIN)
         self.text_widget.tag_configure("function", foreground=COLOR_FUNCTION)

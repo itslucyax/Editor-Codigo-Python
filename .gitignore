@@ -37,8 +37,8 @@ ehthumbs.db
 *.orig
 
 # Scripts de test/diagnostico
-test_*.py
-!test_rapido.py
+# Los tests se mueven a la carpeta /tests
+tests/
 
 # Build / dist
 build/

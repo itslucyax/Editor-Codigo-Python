@@ -67,6 +67,10 @@ COLOR_STRING       = "#ce9178"   # Cadenas
 COLOR_COMMENT      = "#6a9955"   # Comentarios
 # ... etc
 
+# Separador entre sidebar y editor
+COLOR_SEPARADOR    = "#555"      # Línea divisoria vertical
+SEPARADOR_ANCHO    = 1            # Ancho en píxeles de la línea divisoria
+
 # Fuente
 FUENTE_EDITOR      = ("Consolas", 12)
 ```
