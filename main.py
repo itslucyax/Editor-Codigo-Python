@@ -176,9 +176,9 @@ O simplemente:
     final_config = config.merge(cli_args)
     
     # ========================================================================
-    # MODO LOCAL (sin BD) - Por defecto si no hay configuración
+    # MODO LOCAL (sin BD) - Por defecto si no hay configuracion
     # ========================================================================
-    # Si no hay configuración de conexión mínima, ir a modo local automáticamente
+    # Si no hay configuracion de conexion minima, ir a modo local automaticamente
     has_minimal_config = bool(
         final_config.get("server") and 
         final_config.get("database") and 
@@ -190,14 +190,37 @@ O simplemente:
         if not has_minimal_config and not args.local:
             print("INFO: Sin configuracion detectada. Abriendo en modo local...")
             print("      (Para conectar a BD, usa --config-file o --server, --database, etc.)\n")
-        logger.info("Modo local sin conexión a BD")
+        logger.info("Modo local sin conexion a BD")
+        
+        # Datos de ejemplo para que el sidebar muestre contenido en modo local
+        ejemplo_record = {
+            "MODELO": "T01",
+            "CODIGO": "BOBINADO",
+            "TIPO": "VBS",
+            "GRUPO": "PRODUCCION",
+            "DESCRIPCION": "Script de ejemplo para pruebas locales",
+            "SCRIPT": TEXTO_EJEMPLO,
+            "TABLACAMPO0": "valor_0",
+            "TABLACAMPO1": "valor_1",
+            "TABLACAMPO2": "valor_2",
+            "TABLACAMPO3": "valor_3",
+            "TABLACAMPO4": "valor_4",
+            "TABLACAMPO5": "",
+            "TABLACAMPO6": "",
+            "TABLACAMPO7": "",
+            "TABLACAMPO8": "",
+            "TABLACAMPO9": "",
+        }
+        ejemplo_keys = ["MODELO", "CODIGO"]
+        ejemplo_editable = ["GRUPO"]
+        
         app = EditorApp(
             inicial_text=TEXTO_EJEMPLO,
             db=None,
-            record={},
-            key_columns=[],
+            record=ejemplo_record,
+            key_columns=ejemplo_keys,
             content_column="SCRIPT",
-            editable_columns=[]
+            editable_columns=ejemplo_editable
         )
         app.mainloop()
         return

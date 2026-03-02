@@ -274,28 +274,34 @@ class DatabaseConnection:
     # ------------------------------------------------------------------
 
     def get_variables(self, modelo: str, codigo: str,
-                      var_columns: Optional[List[str]] = None) -> List[Tuple[str, str]]:
-        """Lee las columnas Var0…Var9 de la fila del script.
+                      var_columns: Optional[List[str]] = None) -> Tuple[List[str], str]:
+        """Lee las columnas TABLACAMPO0-9 y GRUPO de la fila del script.
 
         Args:
             modelo: Valor de la columna MODELO.
             codigo: Valor de la columna CODIGO.
             var_columns: Lista de nombres de columna a leer.
-                         Por defecto ["VAR0", ..., "VAR9"].
+                         Por defecto ["TABLACAMPO0", ..., "TABLACAMPO9"].
 
         Returns:
-            Lista de tuplas (nombre_columna, valor_str).  Si la columna
-            no existe en la tabla se omite silenciosamente.
+            Tupla (lista de 10 strings con valores de las variables,
+            string con el valor de GRUPO). Valores None se convierten a "".
+
+        Raises:
+            LookupError: Si no existe la fila.
         """
         if var_columns is None:
-            var_columns = [f"VAR{i}" for i in range(10)]
+            var_columns = [f"TABLACAMPO{i}" for i in range(10)]
+
+        # Añadir GRUPO a la consulta
+        all_columns = var_columns + ["GRUPO"]
 
         # Filtrar columnas que realmente existen en la tabla
-        existing = self._existing_columns(var_columns)
+        existing = self._existing_columns(all_columns)
         if not existing:
             logger.warning("Ninguna de las columnas %s existe en %s",
-                           var_columns, self.table)
-            return [(c, "") for c in var_columns]
+                           all_columns, self.table)
+            return (["" for _ in var_columns], "")
 
         cols_sql = ", ".join(f"[{c}]" for c in existing)
         sql = f"""
@@ -306,13 +312,23 @@ class DatabaseConnection:
         cur = self._cursor()
         row = cur.execute(sql, modelo, codigo).fetchone()
 
-        result: List[Tuple[str, str]] = []
-        for i, col_name in enumerate(existing):
-            val = "" if row is None or row[i] is None else str(row[i]).strip()
-            result.append((col_name, val))
+        if not row:
+            raise LookupError(
+                f"No existe registro para MODELO='{modelo}' CODIGO='{codigo}'"
+            )
 
-        logger.debug("get_variables: %s", result)
-        return result
+        # Extraer valores en un dict temporal
+        values = {}
+        for i, col_name in enumerate(existing):
+            val = "" if row[i] is None else str(row[i]).strip()
+            values[col_name] = val
+
+        # Construir lista de 10 variables en orden
+        variables = [values.get(c, "") for c in var_columns]
+        grupo = values.get("GRUPO", "")
+
+        logger.debug("get_variables: vars=%s, grupo=%s", variables, grupo)
+        return (variables, grupo)
 
     def _existing_columns(self, candidates: List[str]) -> List[str]:
         """Devuelve solo los nombres de columna que existen en la tabla."""

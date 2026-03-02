@@ -72,12 +72,21 @@ class Sidebar(tk.Frame):
             if field_upper in self.key_columns or field_upper == self.content_column:
                 continue
             
-            # Detectar variables (VAR0, VAR1, etc.)
+            # Detectar variables: VAR0-VAR9 o TABLACAMPO0-TABLACAMPO9
+            # Solo incluir si tiene valor (no vacio)
             if field_upper.startswith("VAR") and len(field_upper) <= 4:
                 try:
-                    # Verificar que después de VAR venga un número
                     int(field_upper[3:])
-                    self.variable_fields.append((field_name, value))
+                    if value and str(value).strip():
+                        self.variable_fields.append((field_name, value))
+                    continue
+                except (ValueError, IndexError):
+                    pass
+            elif field_upper.startswith("TABLACAMPO") and len(field_upper) <= 11:
+                try:
+                    int(field_upper[10:])
+                    if value and str(value).strip():
+                        self.variable_fields.append((field_name, value))
                     continue
                 except (ValueError, IndexError):
                     pass
@@ -91,11 +100,14 @@ class Sidebar(tk.Frame):
         if self.key_columns:
             self._build_key_section()
         
+        # Mostrar TIPO (significado de la primera letra de MODELO)
+        self._build_tipo_section()
+        
         # Sección de metadata
         if self.metadata_fields:
             self._build_metadata_section()
         
-        # Separador
+        # Separador y variables (solo si hay alguna con valor)
         if self.variable_fields:
             tk.Frame(self, bg="#999", height=1).pack(fill="x", pady=10, padx=5)
             self._build_variables_section()
@@ -121,6 +133,54 @@ class Sidebar(tk.Frame):
                 anchor="w"
             )
             label.pack(fill="x", pady=(0, 2))
+    
+    # Mapeo de la primera letra de MODELO a su significado
+    # Fallback hardcoded — si existe tabla de lookup en BD, se puede sobreescribir
+    TIPO_MAP = {
+        "T": "Orden de Trabajo",
+        "Q": "Etiqueta",
+        "O": "Oferta",
+        "F": "Factura",
+        "U": "U",
+        "P": "P",
+        "L": "L",
+        "R": "R",
+        "A": "A",
+        "S": "S",
+    }
+    
+    def _build_tipo_section(self):
+        """
+        Muestra el TIPO basado en la primera letra de MODELO.
+        Ej: MODELO='T01' -> 'Tipo: T - Orden de Trabajo'
+        """
+        modelo_value = self.record.get("MODELO", "")
+        if not modelo_value:
+            return
+        
+        letra = modelo_value[0].upper()
+        descripcion = self.TIPO_MAP.get(letra, letra)
+        
+        container = tk.Frame(self, bg=COLOR_SIDEBAR_BG)
+        container.pack(fill="x", padx=10, pady=(0, 5))
+        
+        tk.Label(
+            container,
+            text="Tipo:",
+            font=("Segoe UI", 9, "bold"),
+            bg=COLOR_SIDEBAR_BG,
+            fg="#000000",
+            anchor="w"
+        ).pack(fill="x")
+        
+        tk.Label(
+            container,
+            text=f"{letra} - {descripcion}",
+            font=("Segoe UI", 9),
+            bg=COLOR_SIDEBAR_BG,
+            fg="#555555",
+            anchor="w"
+        ).pack(fill="x", pady=(2, 0))
     
     def _build_metadata_section(self):
         """
@@ -210,7 +270,11 @@ class Sidebar(tk.Frame):
         row_frame.pack(fill="x", pady=2)
         
         # Etiqueta "Var 0", "Var 1", etc.
-        display_name = var_name.replace("VAR", "Var ")
+        upper = var_name.upper()
+        if upper.startswith("TABLACAMPO"):
+            display_name = "Var " + upper[10:]
+        else:
+            display_name = var_name.replace("VAR", "Var ")
         tk.Label(
             row_frame,
             text=display_name,
