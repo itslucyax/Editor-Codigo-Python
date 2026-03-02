@@ -19,6 +19,8 @@ from editor.text_editor import TextEditor
 from editor.line_numbers import LineNumbers
 from editor.sidebar import Sidebar
 from editor.search_bar import SearchBar
+from editor.script_selector import ScriptSelector
+from editor.fixed_search_bar import FixedSearchBar
 
 class EditorApp(tk.Tk):
     """
@@ -40,7 +42,8 @@ class EditorApp(tk.Tk):
         record=None,
         key_columns=None,
         content_column="SCRIPT",
-        editable_columns=None
+        editable_columns=None,
+        scripts_list=None
     ):
         super().__init__()
         self.db = db
@@ -48,6 +51,7 @@ class EditorApp(tk.Tk):
         self.key_columns = key_columns or []
         self.content_column = content_column
         self.editable_columns = editable_columns or []
+        self.scripts_list = scripts_list or []
         
         # Título de ventana dinámico
         if self.key_columns and self.record:
@@ -69,12 +73,12 @@ class EditorApp(tk.Tk):
         self.status_bar.pack(side="bottom", fill="x")
 
         # Frame principal
-        frame = tk.Frame(self, bg=COLOR_FONDO)
-        frame.pack(fill="both", expand=True)
+        self.main_frame = tk.Frame(self, bg=COLOR_FONDO)
+        self.main_frame.pack(fill="both", expand=True)
 
         # 1) Sidebar a la izquierda del todo - DINÁMICO
         self.sidebar = Sidebar(
-            frame,
+            self.main_frame,
             record=self.record,
             key_columns=self.key_columns,
             content_column=self.content_column,
@@ -83,19 +87,51 @@ class EditorApp(tk.Tk):
         self.sidebar.pack(side="left", fill="y")
 
         # 2) Separador visual entre sidebar y números de línea
-        tk.Frame(frame, width=SEPARADOR_ANCHO, bg=COLOR_SEPARADOR).pack(side="left", fill="y", padx=5)
+        self.separator = tk.Frame(self.main_frame, width=SEPARADOR_ANCHO, bg=COLOR_SEPARADOR)
+        self.separator.pack(side="left", fill="y", padx=5)
 
-        # 3) Editor de texto (se crea antes que line_numbers porque este lo necesita)
-        self.text_editor = TextEditor(frame)
+        # 3) Frame derecho (barras superiores + área de edición)
+        right_frame = tk.Frame(self.main_frame, bg=COLOR_FONDO)
+        right_frame.pack(side="left", fill="both", expand=True)
 
-        # 4) Números de línea en medio (entre sidebar y editor)
-        self.line_numbers = LineNumbers(frame, self.text_editor)
+        # ============================================================
+        # BARRAS SUPERIORES (siempre visibles)
+        # ============================================================
+
+        # 4a) Selector de scripts (Combobox "Mostrar SCRIPT")
+        self.script_selector = ScriptSelector(
+            right_frame,
+            scripts_list=self.scripts_list,
+            on_select_callback=self._on_script_selected
+        )
+        self.script_selector.pack(side="top", fill="x")
+
+        # 4b) Barra de búsqueda fija (siempre visible)
+        self.fixed_search = FixedSearchBar(right_frame)
+        self.fixed_search.pack(side="top", fill="x")
+
+        # ============================================================
+        # ÁREA DE EDICIÓN
+        # ============================================================
+
+        # 5) Frame del editor (números de línea + editor de texto)
+        editor_frame = tk.Frame(right_frame, bg=COLOR_FONDO)
+        editor_frame.pack(fill="both", expand=True)
+
+        # 6) Editor de texto (se crea antes que line_numbers porque este lo necesita)
+        self.text_editor = TextEditor(editor_frame)
+
+        # Conectar barra de búsqueda fija al editor de texto
+        self.fixed_search.set_text_widget(self.text_editor)
+
+        # 7) Números de línea
+        self.line_numbers = LineNumbers(editor_frame, self.text_editor)
         self.line_numbers.pack(side="left", fill="y")
 
-        # 5) Editor a la derecha
+        # 8) Editor a la derecha
         self.text_editor.pack(side="right", fill="both", expand=True)
 
-        # 6) Barra de búsqueda/reemplazo (flotante sobre el editor)
+        # 9) Barra de búsqueda/reemplazo flotante (Ctrl+H)
         self.search_bar = SearchBar(self.text_editor, self.text_editor)
 
         # Eventos para actualizar status
@@ -145,6 +181,10 @@ class EditorApp(tk.Tk):
             # Obtener campos editados del sidebar
             campos_editados = self.sidebar.get_edited_fields()
             
+            # Agregar valores de variables editadas
+            variable_values = self.sidebar.get_variable_values()
+            campos_editados.update(variable_values)
+            
             # Agregar contenido del script a los campos actualizados
             campos_editados[self.content_column] = contenido
             
@@ -173,6 +213,62 @@ class EditorApp(tk.Tk):
             self.after(1500, self._update_status)
 
         return "break"
+
+    def _on_script_selected(self, index, script_data):
+        """
+        Callback cuando se selecciona un script del selector (Combobox).
+        Carga el registro completo desde BD (contenido + variables + sidebar).
+        Si hay cambios sin guardar, pregunta antes de cambiar.
+        """
+        if self.text_editor.edit_modified():
+            resp = messagebox.askyesnocancel(
+                "Cambios sin guardar",
+                "Hay cambios sin guardar.\n¿Guardar antes de cambiar de script?"
+            )
+            if resp is None:
+                return
+            elif resp:
+                self._guardar()
+        
+        # Si hay BD y key_values en el script, recargar registro completo
+        new_key_values = script_data.get("key_values")
+        if self.db and new_key_values and self.key_columns:
+            try:
+                # Cargar registro completo desde BD
+                new_record = self.db.get_record_full(self.key_columns, new_key_values)
+                self.record = new_record
+                
+                # Actualizar contenido del editor
+                content = new_record.get(self.content_column, script_data.get("content", ""))
+                self.text_editor.set_content(content)
+                
+                # Reconstruir sidebar con los nuevos datos
+                self.sidebar.destroy()
+                self.sidebar = Sidebar(
+                    self.main_frame,
+                    record=self.record,
+                    key_columns=self.key_columns,
+                    content_column=self.content_column,
+                    editable_columns=self.editable_columns
+                )
+                # Insertar antes del separador
+                self.sidebar.pack(side="left", fill="y", before=self.separator)
+                
+                # Actualizar título
+                key_display = " / ".join(str(self.record.get(k, "")) for k in self.key_columns)
+                self.title(f"Editor VBS - {key_display}")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo cargar el script:\n{e}")
+                return
+        else:
+            # Modo local o sin key_values: solo cambiar contenido
+            content = script_data.get("content", "")
+            self.text_editor.set_content(content)
+        
+        self.text_editor.edit_reset()
+        self.text_editor.edit_modified(False)
+        self._update_status()
 
     def _on_cerrar(self):
         """
@@ -220,8 +316,9 @@ class EditorApp(tk.Tk):
     # ------------------------------------------------------------------
 
     def _abrir_buscar(self, event=None):
-        """Abre la barra de búsqueda (Ctrl+F)."""
-        self.search_bar.show(replace=False)
+        """Foco a la barra de búsqueda fija (Ctrl+F)."""
+        self.fixed_search.entry.focus_set()
+        self.fixed_search.entry.select_range(0, "end")
         return "break"
 
     def _abrir_reemplazar(self, event=None):

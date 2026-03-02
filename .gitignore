@@ -61,3 +61,6 @@ dist/
 build/
 dist/
 *.spec
+
+# Apuntes personales
+docs/APUNTES_PROYECTO.md

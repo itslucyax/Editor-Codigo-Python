@@ -91,6 +91,8 @@ class ConfigLoader:
                 self._file_config.update(data["connection"])
             if "script" in data:
                 self._file_config.update(data["script"])
+            if "scripts_list" in data:
+                self._file_config["scripts_list"] = data["scripts_list"]
             
             # También soportar estructura plana
             for key in self.ENV_MAPPING.keys():

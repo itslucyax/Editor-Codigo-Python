@@ -270,6 +270,86 @@ class DatabaseConnection:
         return updated == 1
 
     # ------------------------------------------------------------------
+    # Listado dinámico de scripts (para el desplegable)
+    # ------------------------------------------------------------------
+
+    def get_scripts_for_model(
+        self,
+        key_columns: List[str],
+        key_values: List[str],
+        group_by_column: str = None,
+    ) -> List[dict]:
+        """
+        Obtiene todos los scripts que comparten parte de la clave primaria.
+        
+        Para el desplegable del editor: dado un MODELO, devuelve todos los
+        CODIGOS disponibles con su contenido.
+        
+        Si key_columns=["MODELO","CODIGO"] y key_values=["T01","BOBINADO"],
+        busca todos los registros que coincidan con la PRIMERA clave (MODELO=T01),
+        devolviendo cada uno con su CODIGO y SCRIPT.
+        
+        Args:
+            key_columns: Lista completa de columnas clave (ej: ["MODELO", "CODIGO"])
+            key_values: Lista completa de valores (ej: ["T01", "BOBINADO"])
+            group_by_column: Columna por la que agrupar (default: primera de key_columns)
+            
+        Returns:
+            Lista de dicts: [{"label": "BOBINADO", "key_values": ["T01","BOBINADO"], 
+                              "content": "Sub Main()..."}]
+        """
+        if not key_columns or len(key_columns) < 2:
+            logger.info("get_scripts_for_model: clave simple, no hay lista de scripts")
+            return []
+        
+        cur = self._cursor()
+        
+        # Filtrar por la primera columna clave (ej: MODELO)
+        filter_col = key_columns[0]
+        filter_val = key_values[0]
+        
+        # La segunda columna clave es la que varía (ej: CODIGO)
+        label_col = key_columns[1] if len(key_columns) > 1 else key_columns[0]
+        
+        # Columnas a traer: todas las claves + contenido
+        select_cols = list(key_columns) + [self.content_column]
+        # Eliminar duplicados manteniendo orden
+        select_cols = list(dict.fromkeys(select_cols))
+        
+        cols_sql = ", ".join(f"[{c}]" for c in select_cols)
+        sql = f"SELECT {cols_sql} FROM [{self.table}] WHERE [{filter_col}] = ? ORDER BY [{label_col}]"
+        
+        logger.debug("get_scripts_for_model SQL: %s (val=%s)", sql, filter_val)
+        
+        try:
+            rows = cur.execute(sql, filter_val).fetchall()
+        except Exception as e:
+            logger.warning("Error al obtener lista de scripts: %s", e)
+            return []
+        
+        scripts = []
+        for row in rows:
+            row_dict = {}
+            for i, col in enumerate(select_cols):
+                val = row[i]
+                row_dict[col] = "" if val is None else str(val).strip()
+            
+            # Construir label legible (valor de la segunda clave)
+            label = row_dict.get(label_col, "")
+            content = row_dict.get(self.content_column, "")
+            row_key_values = [row_dict.get(k, "") for k in key_columns]
+            
+            scripts.append({
+                "label": label,
+                "content": content,
+                "key_values": row_key_values,
+            })
+        
+        logger.info("get_scripts_for_model: %d scripts encontrados para %s=%s",
+                    len(scripts), filter_col, filter_val)
+        return scripts
+
+    # ------------------------------------------------------------------
     # Variables de entorno Var0-Var9
     # ------------------------------------------------------------------
 

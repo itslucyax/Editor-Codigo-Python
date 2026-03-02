@@ -214,13 +214,21 @@ O simplemente:
         ejemplo_keys = ["MODELO", "CODIGO"]
         ejemplo_editable = ["GRUPO"]
         
+        # Scripts de ejemplo para el desplegable en modo local
+        ejemplo_scripts = [
+            {"label": "BOBINADO", "content": TEXTO_EJEMPLO, "key_values": ["T01", "BOBINADO"]},
+            {"label": "FACTURA", "content": "' Script FACTURA\nSub Factura()\n    Dim total As Double\n    total = 100.50\n    MsgBox \"Total: \" & total\nEnd Sub", "key_values": ["T01", "FACTURA"]},
+            {"label": "ETIQUETA", "content": "' Script ETIQUETA\nSub Etiqueta()\n    Dim codigo As String\n    codigo = var0\n    MsgBox \"Codigo: \" & codigo\nEnd Sub", "key_values": ["T01", "ETIQUETA"]},
+        ]
+        
         app = EditorApp(
             inicial_text=TEXTO_EJEMPLO,
             db=None,
             record=ejemplo_record,
             key_columns=ejemplo_keys,
             content_column="SCRIPT",
-            editable_columns=ejemplo_editable
+            editable_columns=ejemplo_editable,
+            scripts_list=ejemplo_scripts
         )
         app.mainloop()
         return
@@ -294,13 +302,28 @@ O simplemente:
     # ========================================================================
     # LANZAR EDITOR CON DATOS DINÁMICOS
     # ========================================================================
+    # Cargar lista de scripts dinámicamente desde BD (para el desplegable)
+    scripts_list = final_config.get("scripts_list", [])
+    
+    if not scripts_list and db:
+        try:
+            scripts_list = db.get_scripts_for_model(
+                key_columns=final_config["key_columns"],
+                key_values=final_config["key_values"],
+            )
+            logger.info("Scripts disponibles en desplegable: %d", len(scripts_list))
+        except Exception as e:
+            logger.warning("No se pudo cargar lista de scripts: %s", e)
+            scripts_list = []
+    
     app = EditorApp(
         inicial_text=contenido,
         db=db,
         record=record,
         key_columns=final_config["key_columns"],
         content_column=final_config["content_column"],
-        editable_columns=final_config.get("editable_columns", [])
+        editable_columns=final_config.get("editable_columns", []),
+        scripts_list=scripts_list
     )
     
     app.mainloop()

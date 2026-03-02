@@ -77,16 +77,14 @@ class Sidebar(tk.Frame):
             if field_upper.startswith("VAR") and len(field_upper) <= 4:
                 try:
                     int(field_upper[3:])
-                    if value and str(value).strip():
-                        self.variable_fields.append((field_name, value))
+                    self.variable_fields.append((field_name, value))
                     continue
                 except (ValueError, IndexError):
                     pass
             elif field_upper.startswith("TABLACAMPO") and len(field_upper) <= 11:
                 try:
                     int(field_upper[10:])
-                    if value and str(value).strip():
-                        self.variable_fields.append((field_name, value))
+                    self.variable_fields.append((field_name, value))
                     continue
                 except (ValueError, IndexError):
                     pass
@@ -107,10 +105,9 @@ class Sidebar(tk.Frame):
         if self.metadata_fields:
             self._build_metadata_section()
         
-        # Separador y variables (solo si hay alguna con valor)
-        if self.variable_fields:
-            tk.Frame(self, bg="#999", height=1).pack(fill="x", pady=10, padx=5)
-            self._build_variables_section()
+        # Separador y variables (siempre 10 filas fijas editables)
+        tk.Frame(self, bg="#999", height=1).pack(fill="x", pady=10, padx=5)
+        self._build_variables_section()
     
     def _build_key_section(self):
         """
@@ -236,7 +233,7 @@ class Sidebar(tk.Frame):
                 label.pack(fill="x", pady=(2, 0))
     
     def _build_variables_section(self):
-        """Construye la sección inferior con las variables (VAR0-VAR9)."""
+        """Construye la sección inferior con 10 filas fijas (Var 0 a Var 9) editables."""
         container = tk.Frame(self, bg=COLOR_SIDEBAR_BG)
         container.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         
@@ -250,16 +247,36 @@ class Sidebar(tk.Frame):
             anchor="w"
         ).pack(fill="x", pady=(0, 8))
         
-        # Ordenar variables por número (VAR0, VAR1, ..., VAR9)
-        sorted_vars = sorted(self.variable_fields, key=lambda x: x[0])
+        # Indexar variables existentes por su número
+        existing_vars = {}
+        for var_name, var_value in self.variable_fields:
+            upper = var_name.upper()
+            if upper.startswith("TABLACAMPO"):
+                try:
+                    idx = int(upper[10:])
+                    existing_vars[idx] = (var_name, str(var_value).strip() if var_value else "")
+                except ValueError:
+                    pass
+            elif upper.startswith("VAR"):
+                try:
+                    idx = int(upper[3:])
+                    existing_vars[idx] = (var_name, str(var_value).strip() if var_value else "")
+                except ValueError:
+                    pass
         
-        # Crear filas para cada variable
-        for var_name, var_value in sorted_vars:
+        # Siempre crear 10 filas (Var 0 a Var 9)
+        for i in range(10):
+            if i in existing_vars:
+                var_name, var_value = existing_vars[i]
+            else:
+                var_name = f"VAR{i}"
+                var_value = ""
             self._create_variable_row(container, var_name, var_value)
     
     def _create_variable_row(self, parent, var_name, value):
         """
-        Crea una fila con etiqueta "VAR X" y Entry readonly para el valor.
+        Crea una fila con etiqueta "Var X" y Entry editable para el valor.
+        El usuario puede escribir el nombre del campo de BD (ej: g_cfacli.FACTURA).
         
         Args:
             parent: Widget padre
@@ -285,25 +302,19 @@ class Sidebar(tk.Frame):
             anchor="w"
         ).pack(side="left", padx=(0, 5))
         
-        # Entry readonly para el valor
+        # Entry EDITABLE para el valor
         entry = tk.Entry(
             row_frame,
             font=("Consolas", 8),
-            bg="#E8E8E8",  # Fondo más oscuro que el editor
+            bg="#FFFFFF",
             fg="#000000",
             relief="solid",
             borderwidth=1,
-            state="readonly"
         )
-        
-        # Configurar el valor (necesitamos cambiar temporalmente el estado)
-        entry.config(state="normal")
         entry.insert(0, value)
-        entry.config(state="readonly")
-        
         entry.pack(side="left", fill="x", expand=True)
         
-        # Guardar referencia (por si acaso necesitamos actualizar después)
+        # Guardar referencia
         self.field_widgets[var_name] = entry
     
     def get_edited_fields(self) -> dict:
@@ -332,7 +343,6 @@ class Sidebar(tk.Frame):
         # Actualizar con valores editados
         for field_name, widget in self.field_widgets.items():
             if isinstance(widget, tk.Entry):
-                # Obtener valor actual (temporalmente cambiar estado si es readonly)
                 current_state = widget.cget("state")
                 if current_state == "readonly":
                     widget.config(state="normal")
@@ -343,3 +353,39 @@ class Sidebar(tk.Frame):
                 result[field_name] = value
         
         return result
+
+    def get_variable_values(self) -> dict:
+        """
+        Obtiene los valores actuales de las 10 variables (Var 0 a Var 9).
+        
+        Returns:
+            Diccionario {nombre_columna: valor} para las variables con contenido
+        """
+        variables = {}
+        for field_name, widget in self.field_widgets.items():
+            upper = field_name.upper()
+            is_var = (
+                (upper.startswith("VAR") and len(upper) <= 4) or
+                (upper.startswith("TABLACAMPO") and len(upper) <= 11)
+            )
+            if is_var and isinstance(widget, tk.Entry):
+                value = widget.get().strip()
+                if value:  # Solo incluir variables con valor
+                    variables[field_name] = value
+        return variables
+
+    def set_variable_values(self, values: list):
+        """
+        Establece los valores de las 10 variables desde una lista de strings.
+        
+        Args:
+            values: Lista de 10 strings con los valores para Var 0 a Var 9
+        """
+        for i, value in enumerate(values[:10]):
+            # Buscar el widget por diferentes nombres posibles
+            for key_pattern in [f"VAR{i}", f"TABLACAMPO{i}"]:
+                for field_name, widget in self.field_widgets.items():
+                    if field_name.upper() == key_pattern and isinstance(widget, tk.Entry):
+                        widget.delete(0, tk.END)
+                        widget.insert(0, value or "")
+                        break
