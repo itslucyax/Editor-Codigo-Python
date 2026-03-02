@@ -1,0 +1,69 @@
+SELECT TABLACAMPO0, TABLACAMPO1, TABLACAMPO2, TABLACAMPO3, TABLACAMPO4,
+       TABLACAMPO5, TABLACAMPO6, TABLACAMPO7, TABLACAMPO8, TABLACAMPO9, GRUPO
+FROM G_SCRIPT
+WHERE MODELO = ? AND CODIGO = ?
+```
+
+La misma query que ya carga el script, pero seleccionando más columnas.
+
+---
+
+Aquí tienes el prompt para la IA de VS Code:
+
+---
+```
+Tengo el método _cargar_variables(modelo, codigo) en sidebar.py que
+actualmente devuelve [""] * 10 como placeholder.
+
+Ahora ya conozco la estructura real de la base de datos y hay que implementarlo.
+
+ESTRUCTURA DE LA TABLA G_SCRIPT:
+La misma tabla de la que ya se lee el script contiene también las variables.
+Las columnas relevantes son:
+- TABLACAMPO0 → valor de Var0
+- TABLACAMPO1 → valor de Var1
+- TABLACAMPO2 → valor de Var2
+- TABLACAMPO3 → valor de Var3
+- TABLACAMPO4 → valor de Var4
+- TABLACAMPO5 → valor de Var5
+- TABLACAMPO6 → valor de Var6
+- TABLACAMPO7 → valor de Var7
+- TABLACAMPO8 → valor de Var8
+- TABLACAMPO9 → valor de Var9
+- GRUPO        → valor del campo Grupo del sidebar
+
+Todas están en la misma fila identificada por MODELO + CODIGO,
+que es la clave compuesta que ya usa el resto del proyecto.
+
+LO QUE HAY QUE HACER:
+
+1. En db/connection.py, añadir un método nuevo:
+   get_variables(modelo, codigo) → tuple(list[str], str)
+   Que haga esta query:
+   SELECT TABLACAMPO0, TABLACAMPO1, TABLACAMPO2, TABLACAMPO3, TABLACAMPO4,
+          TABLACAMPO5, TABLACAMPO6, TABLACAMPO7, TABLACAMPO8, TABLACAMPO9, GRUPO
+   FROM [G_SCRIPT]
+   WHERE [MODELO] = ? AND [CODIGO] = ?
+   Y devuelva una tupla: (lista de 10 strings con los valores de las variables,
+   string con el valor de GRUPO).
+   Los valores None de la BD deben convertirse a string vacío "".
+   Mismo manejo de errores que get_script(): lanzar LookupError si no
+   encuentra la fila.
+
+2. En sidebar.py, sustituir el método _cargar_variables() placeholder
+   por una llamada real a db.get_variables(modelo, codigo).
+   El resultado rellena los Entry de Var0-Var9 y el campo Grupo.
+   Si db es None (modo local), dejar todo vacío sin lanzar error.
+
+3. En app.py, después de crear la conexión y antes de lanzar EditorApp,
+   llamar a db.get_variables() y pasar el resultado al constructor
+   del Sidebar. O alternativamente dejar que el Sidebar lo llame
+   internamente si recibe db — lo que sea más limpio, tú decides.
+
+IMPORTANTE:
+- No cambies la lógica de get_script() ni de save_script()
+- Mantén la compatibilidad con modo local (db=None)
+- Usa parámetros tipados en la query (? en pyodbc), nunca concatenación
+  de strings para evitar SQL injection
+- El nombre de la tabla es configurable en DatabaseConnection
+  igual que ya lo hace get_script(), usar self.table
