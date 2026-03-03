@@ -1,15 +1,18 @@
 """
-Conexión a SQL Server para leer/guardar scripts en la tabla G_SCRIPT.
+Conexión dinámica a SQL Server para leer/guardar scripts.
 
-Autenticación: SQL Authentication (usuario/contraseña)
-Clave compuesta: MODELO (nvarchar(3)) + CODIGO (nvarchar(20))
-Columna de contenido: configurable via --content-column
+Soporta:
+- Conexión por parámetros individuales (server, database, user, password)
+- Conexión por cadena de conexión completa (connection string)
+- Detección automática de contexto: Plantilla vs. Documento
+- Auto-detección de driver ODBC
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Optional, List, Tuple
+import re
+from typing import Optional, List, Tuple, Dict
 
 import pyodbc
 
@@ -26,6 +29,19 @@ _PREFERRED_DRIVERS = [
     "SQL Server Native Client 10.0",
     "SQL Server",
 ]
+
+
+# ======================================================================
+# Contextos de trabajo
+# ======================================================================
+CONTEXT_DOCUMENTO = "documento"
+CONTEXT_PLANTILLA = "plantilla"
+
+# Tablas por defecto según contexto (configurables)
+DEFAULT_TABLES = {
+    CONTEXT_DOCUMENTO: "G_SCRIPT",
+    CONTEXT_PLANTILLA: "G_SCRIPT_PLANTILLA",
+}
 
 
 def detect_odbc_driver() -> str:
@@ -49,9 +65,154 @@ def detect_odbc_driver() -> str:
     )
 
 
+# ======================================================================
+# Parser de cadena de conexión
+# ======================================================================
+
+# Mapeo de claves comunes en connection strings → nombres internos
+_CONN_STR_KEY_MAP = {
+    # Formato ODBC
+    "DRIVER":                    "driver",
+    "SERVER":                    "server",
+    "DATABASE":                  "database",
+    "UID":                       "user",
+    "PWD":                       "password",
+    "TRUSTSERVERCERTIFICATE":    "trust_server_certificate",
+    # Formato ADO.NET
+    "DATA SOURCE":               "server",
+    "INITIAL CATALOG":           "database",
+    "USER ID":                   "user",
+    "PASSWORD":                  "password",
+    # Variantes comunes
+    "ADDR":                      "server",
+    "ADDRESS":                   "server",
+    "DB":                        "database",
+    "USER":                      "user",
+    "TRUSTED_CONNECTION":        "trusted_connection",
+}
+
+
+def parse_connection_string(conn_str: str) -> Dict[str, str]:
+    """Parsea una cadena de conexión SQL Server y extrae sus componentes.
+
+    Soporta formatos ODBC y ADO.NET:
+        ODBC:    "Driver={ODBC Driver 18 for SQL Server};Server=srv;Database=db;UID=u;PWD=p;"
+        ADO.NET: "Data Source=srv;Initial Catalog=db;User ID=u;Password=p;"
+
+    Args:
+        conn_str: Cadena de conexión completa.
+
+    Returns:
+        Diccionario con claves normalizadas:
+        {
+            "driver":   "ODBC Driver 18 for SQL Server",
+            "server":   "miservidor\\instancia",
+            "database": "MiBase",
+            "user":     "sa",
+            "password": "secreto",
+            "trust_server_certificate": "yes",
+            ...  (cualquier clave extra se incluye tal cual)
+        }
+
+    Raises:
+        ValueError: Si la cadena está vacía o no tiene formato válido.
+    """
+    if not conn_str or not conn_str.strip():
+        raise ValueError("La cadena de conexión está vacía")
+
+    result: Dict[str, str] = {}
+
+    # Separar por ';' respetando valores entre llaves {}
+    # Ejemplo: Driver={ODBC Driver 18 for SQL Server};Server=srv
+    parts = re.split(r";(?![^{}]*})", conn_str)
+
+    for part in parts:
+        part = part.strip()
+        if not part or "=" not in part:
+            continue
+
+        # Separar en clave=valor (solo en el primer '=')
+        key, value = part.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+
+        # Quitar llaves del valor si las tiene (ej: {ODBC Driver 18...})
+        if value.startswith("{") and value.endswith("}"):
+            value = value[1:-1]
+
+        # Normalizar clave
+        key_upper = key.upper()
+        internal_key = _CONN_STR_KEY_MAP.get(key_upper, key.lower().replace(" ", "_"))
+
+        result[internal_key] = value
+
+    if not result:
+        raise ValueError(
+            f"No se pudieron extraer parámetros de la cadena de conexión.\n"
+            f"Formato esperado: 'Server=srv;Database=db;UID=user;PWD=pass;'"
+        )
+
+    # Normalizar trust_server_certificate a booleano-string
+    if "trust_server_certificate" in result:
+        val = result["trust_server_certificate"].lower()
+        result["trust_server_certificate"] = val in ("yes", "true", "1")
+    else:
+        result["trust_server_certificate"] = True  # default seguro
+
+    logger.info(
+        "Connection string parseada: server=%s, database=%s, user=%s",
+        result.get("server", "N/A"),
+        result.get("database", "N/A"),
+        result.get("user", "N/A"),
+    )
+    return result
+
+
+def resolve_table_for_context(
+    context_type: str,
+    table_override: Optional[str] = None,
+    table_map: Optional[Dict[str, str]] = None,
+) -> str:
+    """Determina la tabla correcta según el contexto de trabajo.
+
+    Args:
+        context_type: 'documento' o 'plantilla'.
+        table_override: Si se proporciona, se usa directamente (ignora contexto).
+        table_map: Mapeo personalizado {contexto: tabla}. Si no se da, usa DEFAULT_TABLES.
+
+    Returns:
+        Nombre de la tabla a usar.
+
+    Raises:
+        ValueError: Si el contexto no es válido.
+    """
+    if table_override:
+        logger.info("Tabla forzada por parámetro: %s", table_override)
+        return table_override
+
+    ctx = context_type.lower().strip()
+    mapping = table_map or DEFAULT_TABLES
+
+    if ctx not in mapping:
+        valid = ", ".join(mapping.keys())
+        raise ValueError(
+            f"Contexto '{context_type}' no válido. Valores permitidos: {valid}"
+        )
+
+    table = mapping[ctx]
+    logger.info("Tabla resuelta por contexto '%s': %s", ctx, table)
+    return table
+
+
 class DatabaseConnection:
     """
     Conecta con SQL Server usando pyodbc y permite leer/guardar scripts.
+
+    Soporta dos modos de construcción:
+    1. Parámetros individuales: DatabaseConnection(server=..., database=..., ...)
+    2. Cadena de conexión:      DatabaseConnection.from_connection_string(conn_str, ...)
+
+    El contexto de trabajo (Plantilla/Documento) determina la tabla automáticamente.
     """
 
     def __init__(
@@ -64,6 +225,7 @@ class DatabaseConnection:
         driver: str = "ODBC Driver 18 for SQL Server",
         trust_server_certificate: bool = True,
         content_column: str = "SCRIPT",
+        context_type: Optional[str] = None,
     ):
         self.server = server
         self.database = database
@@ -73,8 +235,111 @@ class DatabaseConnection:
         self.driver = driver
         self.trust_server_certificate = trust_server_certificate
         self.content_column = content_column
+        self.context_type = context_type  # 'documento' | 'plantilla' | None
 
         self._cnxn: Optional[pyodbc.Connection] = None
+
+    # ------------------------------------------------------------------
+    # Constructor alternativo: desde cadena de conexión
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def from_connection_string(
+        cls,
+        conn_str: str,
+        context_type: str = CONTEXT_DOCUMENTO,
+        table: Optional[str] = None,
+        table_map: Optional[Dict[str, str]] = None,
+        content_column: str = "SCRIPT",
+    ) -> "DatabaseConnection":
+        """Crea una instancia a partir de una cadena de conexión completa.
+
+        Parsea la cadena, extrae cada componente y resuelve la tabla
+        según el contexto de trabajo.
+
+        Args:
+            conn_str: Cadena de conexión SQL Server.
+                Ej: "Driver={ODBC Driver 18 for SQL Server};Server=srv;Database=db;UID=sa;PWD=123;"
+            context_type: 'documento' o 'plantilla'. Determina la tabla por defecto.
+            table: Si se proporciona, sobrescribe la tabla resuelta por contexto.
+            table_map: Mapeo personalizado {contexto: tabla}.
+            content_column: Columna que contiene el script.
+
+        Returns:
+            Instancia de DatabaseConnection lista para llamar a connect().
+
+        Raises:
+            ValueError: Si la cadena no es válida o faltan datos mínimos.
+        """
+        params = parse_connection_string(conn_str)
+
+        # Resolución de la tabla por contexto
+        resolved_table = resolve_table_for_context(
+            context_type, table_override=table, table_map=table_map
+        )
+
+        # Extraer driver, o auto-detectar
+        driver = params.get("driver", None)
+        if not driver:
+            driver = detect_odbc_driver()
+
+        # Validar datos mínimos
+        server = params.get("server")
+        database = params.get("database")
+        user = params.get("user")
+        password = params.get("password")
+
+        if not server or not database:
+            raise ValueError(
+                "La cadena de conexión debe contener al menos Server y Database.\n"
+                f"Datos extraídos: {params}"
+            )
+
+        trust = params.get("trust_server_certificate", True)
+
+        logger.info(
+            "DatabaseConnection creada desde connection string: "
+            "server=%s, db=%s, tabla=%s (contexto=%s)",
+            server, database, resolved_table, context_type,
+        )
+
+        return cls(
+            server=server,
+            database=database,
+            table=resolved_table,
+            user=user,
+            password=password,
+            driver=driver,
+            trust_server_certificate=trust,
+            content_column=content_column,
+            context_type=context_type,
+        )
+
+    # ------------------------------------------------------------------
+    # Utilidades de contexto
+    # ------------------------------------------------------------------
+
+    @property
+    def is_plantilla(self) -> bool:
+        """True si el contexto actual es Plantilla."""
+        return self.context_type == CONTEXT_PLANTILLA
+
+    @property
+    def is_documento(self) -> bool:
+        """True si el contexto actual es Documento."""
+        return self.context_type == CONTEXT_DOCUMENTO
+
+    def switch_context(self, new_context: str, table_map: Optional[Dict[str, str]] = None) -> None:
+        """Cambia el contexto de trabajo y actualiza la tabla.
+
+        Args:
+            new_context: 'documento' o 'plantilla'.
+            table_map: Mapeo personalizado. Si no se da, usa DEFAULT_TABLES.
+        """
+        old = self.context_type
+        self.context_type = new_context.lower().strip()
+        self.table = resolve_table_for_context(self.context_type, table_map=table_map)
+        logger.info("Contexto cambiado: %s → %s (tabla: %s)", old, self.context_type, self.table)
 
     def connect(self) -> None:
         """
@@ -265,8 +530,6 @@ class DatabaseConnection:
         updated = cur.rowcount
         self._cnxn.commit()
         logger.info("save_record_full: %d filas actualizadas", updated)
-        return updated == 1
-
         return updated == 1
 
     # ------------------------------------------------------------------

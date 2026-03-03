@@ -43,7 +43,8 @@ class EditorApp(tk.Tk):
         key_columns=None,
         content_column="SCRIPT",
         editable_columns=None,
-        scripts_list=None
+        scripts_list=None,
+        context_type=None
     ):
         super().__init__()
         self.db = db
@@ -52,13 +53,18 @@ class EditorApp(tk.Tk):
         self.content_column = content_column
         self.editable_columns = editable_columns or []
         self.scripts_list = scripts_list or []
+        self.context_type = context_type  # 'documento' | 'plantilla' | None
         
-        # Título de ventana dinámico
+        # Título de ventana dinámico con contexto
+        ctx_label = ""
+        if self.context_type:
+            ctx_label = f" [{self.context_type.capitalize()}]"
+        
         if self.key_columns and self.record:
             key_display = " / ".join(str(self.record.get(k, "")) for k in self.key_columns)
-            self.title(f"Editor VBS - {key_display}")
+            self.title(f"Editor VBS{ctx_label} - {key_display}")
         else:
-            self.title("Editor VBS - Local")
+            self.title(f"Editor VBS{ctx_label} - Local")
         
         self.configure(bg=COLOR_FONDO)
         self.geometry("1100x650")
@@ -158,10 +164,13 @@ class EditorApp(tk.Tk):
 
     def _get_origen_label(self) -> str:
         """Devuelve etiqueta para la barra de estado."""
+        ctx = ""
+        if self.context_type:
+            ctx = f" | {self.context_type.capitalize()}"
         if self.db and self.key_columns and self.record:
             key_display = "/".join(str(self.record.get(k, "")) for k in self.key_columns)
-            return f"SQL ({key_display})"
-        return "Local"
+            return f"SQL ({key_display}){ctx}"
+        return f"Local{ctx}"
 
     def _update_status(self, event=None):
         """Actualiza la barra de estado con posición y estado de modificación."""
@@ -255,8 +264,11 @@ class EditorApp(tk.Tk):
                 self.sidebar.pack(side="left", fill="y", before=self.separator)
                 
                 # Actualizar título
+                ctx_label = ""
+                if self.context_type:
+                    ctx_label = f" [{self.context_type.capitalize()}]"
                 key_display = " / ".join(str(self.record.get(k, "")) for k in self.key_columns)
-                self.title(f"Editor VBS - {key_display}")
+                self.title(f"Editor VBS{ctx_label} - {key_display}")
                 
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo cargar el script:\n{e}")

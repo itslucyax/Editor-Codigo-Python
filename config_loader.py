@@ -45,6 +45,9 @@ class ConfigLoader:
         "key_values": "KEY_VALUES",    # Formato: "T01,SCRIPT001"
         "var_columns": "VAR_COLUMNS",  # Formato: "VAR0,VAR1,VAR2"
         "config_file": "CONFIG_FILE",
+        "tipo": "TIPO",                # Contexto: "documento" o "plantilla"
+        "table_documento": "TABLE_DOCUMENTO",    # Tabla para modo documento
+        "table_plantilla": "TABLE_PLANTILLA",    # Tabla para modo plantilla
     }
     
     def __init__(self):
@@ -207,15 +210,17 @@ class ConfigLoader:
             return
         
         # Opción 2: Parámetros individuales
-        required = ["server", "database", "table", "user", "password"]
+        # Nota: 'table' ya no es obligatorio porque se resuelve por contexto (--tipo)
+        required = ["server", "database", "user", "password"]
         missing = [k for k in required if k not in self.config]
         
         if missing:
             raise ValueError(
                 f"Configuración de conexión incompleta. Faltan: {', '.join(missing)}\n"
                 "Opciones:\n"
-                "1. Proporcionar connection_string completa\n"
-                "2. Proporcionar: server, database, table, user, password"
+                "1. Proporcionar connection_string completa (--connection-string)\n"
+                "2. Proporcionar: server, database, user, password\n"
+                "   La tabla se resuelve automáticamente según --tipo (documento/plantilla)"
             )
     
     def validate_script_config(self) -> None:
