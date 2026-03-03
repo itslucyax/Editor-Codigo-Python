@@ -388,12 +388,13 @@ O simplemente:
         context_type=context_type
     )
     
-    app.mainloop()
-    
-    # Cerrar conexión
-    if db is not None:
-        db.close()
-        logger.info("Conexión cerrada")
+    try:
+        app.mainloop()
+    finally:
+        # Garantizar que la conexión se cierra aunque la app falle
+        if db is not None:
+            db.close()
+            logger.info("Conexión cerrada")
 
 
 if __name__ == "__main__":

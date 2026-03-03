@@ -18,6 +18,36 @@ import pyodbc
 
 logger = logging.getLogger("EditorVBS.db")
 
+# Patrón para validar identificadores SQL Server (nombres de tabla/columna)
+# Solo permite letras, números, guiones bajos, espacios y # (tablas temporales)
+_VALID_SQL_IDENTIFIER = re.compile(r"^[\w\s#@$]+$", re.UNICODE)
+
+
+def _sanitize_identifier(name: str, label: str = "identificador") -> str:
+    """Valida que un nombre de tabla o columna sea seguro para usar en SQL.
+
+    Solo permite caracteres alfanuméricos, guiones bajos, espacios, # y @.
+    Rechaza cualquier cosa que pueda ser inyección SQL.
+
+    Args:
+        name: Nombre a validar (ej: 'G_SCRIPT', 'MODELO').
+        label: Etiqueta para el mensaje de error (ej: 'tabla', 'columna').
+
+    Returns:
+        El mismo nombre si es válido.
+
+    Raises:
+        ValueError: Si el nombre contiene caracteres no permitidos.
+    """
+    if not name or not name.strip():
+        raise ValueError(f"El {label} no puede estar vacío")
+    if not _VALID_SQL_IDENTIFIER.match(name):
+        raise ValueError(
+            f"{label} '{name}' contiene caracteres no permitidos. "
+            f"Solo se aceptan letras, números y guiones bajos."
+        )
+    return name
+
 # Drivers ODBC preferidos, de más reciente a más antiguo
 _PREFERRED_DRIVERS = [
     "ODBC Driver 18 for SQL Server",
@@ -131,16 +161,16 @@ def parse_connection_string(conn_str: str) -> Dict[str, str]:
         if not part or "=" not in part:
             continue
 
-        # Separar en clave=valor (solo en el primer '=')
+        #Separar en clave=valor (solo en el primer '=')
         key, value = part.split("=", 1)
         key = key.strip()
         value = value.strip()
 
-        # Quitar llaves del valor si las tiene (ej: {ODBC Driver 18...})
+        #Quitar llaves del valor si las tiene (ej: {ODBC Driver 18...})
         if value.startswith("{") and value.endswith("}"):
             value = value[1:-1]
 
-        # Normalizar clave
+        #Normalizar clave
         key_upper = key.upper()
         internal_key = _CONN_STR_KEY_MAP.get(key_upper, key.lower().replace(" ", "_"))
 
@@ -238,6 +268,20 @@ class DatabaseConnection:
         self.context_type = context_type  # 'documento' | 'plantilla' | None
 
         self._cnxn: Optional[pyodbc.Connection] = None
+
+    # ------------------------------------------------------------------
+    # Context manager: permite usar 'with DatabaseConnection(...) as db:'
+    # ------------------------------------------------------------------
+
+    def __enter__(self) -> "DatabaseConnection":
+        """Abre la conexión al entrar en el bloque 'with'."""
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Cierra la conexión al salir del bloque 'with', haya error o no."""
+        self.close()
+        return False  # No suprimimos excepciones, se propagan normalmente
 
     # ------------------------------------------------------------------
     # Constructor alternativo: desde cadena de conexión
@@ -387,85 +431,17 @@ class DatabaseConnection:
             raise RuntimeError("No hay conexión abierta. Llama a connect() primero.")
         return self._cnxn.cursor()
 
-    def get_script(self, modelo: str, codigo: str) -> str:
-        """
-        Lee el script desde la base de datos.
-        
-        Args:
-            modelo: Valor de la columna MODELO
-            codigo: Valor de la columna CODIGO
-            
-        Returns:
-            Contenido del script como string (line endings normalizados a \n)
-            
-        Raises:
-            LookupError: Si no existe el script
-            pyodbc.ProgrammingError: Si la columna no existe (error 42S22)
-        """
-        cur = self._cursor()
+    # ------------------------------------------------------------------
+    # Sanitización de identificadores SQL
+    # ------------------------------------------------------------------
 
-        sql = f"""
-        SELECT [{self.content_column}]
-        FROM [{self.table}]
-        WHERE [MODELO] = ? AND [CODIGO] = ?
-        """
+    def _safe_table(self) -> str:
+        """Devuelve el nombre de tabla validado para uso en SQL."""
+        return _sanitize_identifier(self.table, "tabla")
 
-        try:
-            row = cur.execute(sql, modelo, codigo).fetchone()
-        except pyodbc.ProgrammingError as e:
-            # Error 42S22 = columna no existe
-            if "42S22" in str(e):
-                raise LookupError(
-                    f"La columna '{self.content_column}' no existe en la tabla '{self.table}'. "
-                    f"Usa --content-column para especificar el nombre correcto."
-                ) from e
-            raise
-
-        if not row:
-            raise LookupError(f"No existe script para MODELO='{modelo}' CODIGO='{codigo}'")
-
-        # Convertir a str y normalizar line endings para Tkinter
-        content = "" if row[0] is None else str(row[0])
-        return content.replace("\r\n", "\n").replace("\r", "\n")
-
-    def save_script(self, modelo: str, codigo: str, content: str) -> bool:
-        """
-        Guarda el script en la base de datos.
-        
-        Args:
-            modelo: Valor de la columna MODELO
-            codigo: Valor de la columna CODIGO  
-            content: Nuevo contenido del script
-            
-        Returns:
-            True si se actualizó exactamente 1 fila
-            
-        Raises:
-            pyodbc.ProgrammingError: Si la columna no existe
-        """
-        cur = self._cursor()
-
-        sql = f"""
-        UPDATE [{self.table}]
-        SET [{self.content_column}] = ?
-        WHERE [MODELO] = ? AND [CODIGO] = ?
-        """
-
-        try:
-            cur.execute(sql, content, modelo, codigo)
-        except pyodbc.ProgrammingError as e:
-            if "42S22" in str(e):
-                raise LookupError(
-                    f"La columna '{self.content_column}' no existe. "
-                    f"Verifica --content-column."
-                ) from e
-            raise
-
-        updated = cur.rowcount
-        self._cnxn.commit()
-        logger.info("save_script: %d filas actualizadas (MODELO=%s, CODIGO=%s)",
-                    updated, modelo, codigo)
-        return updated == 1
+    def _safe_column(self, col: str) -> str:
+        """Devuelve un nombre de columna validado para uso en SQL."""
+        return _sanitize_identifier(col, "columna")
 
     def save_record_full(
         self, 
@@ -500,15 +476,18 @@ class DatabaseConnection:
         
         cur = self._cursor()
         
-        # Construir SET clause
-        set_parts = [f"[{col}] = ?" for col in updated_fields.keys()]
+        # Sanitizar todos los nombres de columna antes de construir el SQL
+        safe_table = self._safe_table()
+        
+        # Construir SET clause (con columnas validadas)
+        set_parts = [f"[{self._safe_column(col)}] = ?" for col in updated_fields.keys()]
         set_clause = ", ".join(set_parts)
         
-        # Construir WHERE clause
-        where_parts = [f"[{col}] = ?" for col in key_columns]
+        # Construir WHERE clause (con columnas validadas)
+        where_parts = [f"[{self._safe_column(col)}] = ?" for col in key_columns]
         where_clause = " AND ".join(where_parts)
         
-        sql = f"UPDATE [{self.table}] SET {set_clause} WHERE {where_clause}"
+        sql = f"UPDATE [{safe_table}] SET {set_clause} WHERE {where_clause}"
         
         # Preparar valores para la query
         values = list(updated_fields.values()) + key_values
@@ -579,8 +558,12 @@ class DatabaseConnection:
         # Eliminar duplicados manteniendo orden
         select_cols = list(dict.fromkeys(select_cols))
         
-        cols_sql = ", ".join(f"[{c}]" for c in select_cols)
-        sql = f"SELECT {cols_sql} FROM [{self.table}] WHERE [{filter_col}] = ? ORDER BY [{label_col}]"
+        # Sanitizar todos los identificadores
+        safe_table = self._safe_table()
+        cols_sql = ", ".join(f"[{self._safe_column(c)}]" for c in select_cols)
+        safe_filter = self._safe_column(filter_col)
+        safe_label = self._safe_column(label_col)
+        sql = f"SELECT {cols_sql} FROM [{safe_table}] WHERE [{safe_filter}] = ? ORDER BY [{safe_label}]"
         
         logger.debug("get_scripts_for_model SQL: %s (val=%s)", sql, filter_val)
         
@@ -646,10 +629,11 @@ class DatabaseConnection:
                            all_columns, self.table)
             return (["" for _ in var_columns], "")
 
-        cols_sql = ", ".join(f"[{c}]" for c in existing)
+        safe_table = self._safe_table()
+        cols_sql = ", ".join(f"[{self._safe_column(c)}]" for c in existing)
         sql = f"""
         SELECT {cols_sql}
-        FROM [{self.table}]
+        FROM [{safe_table}]
         WHERE [MODELO] = ? AND [CODIGO] = ?
         """
         cur = self._cursor()
@@ -681,7 +665,7 @@ class DatabaseConnection:
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_NAME = ?
         """
-        rows = cur.execute(sql, self.table).fetchall()
+        rows = cur.execute(sql, self._safe_table()).fetchall()
         table_cols = {r[0].upper() for r in rows}
         return [c for c in candidates if c.upper() in table_cols]
 
@@ -718,7 +702,7 @@ class DatabaseConnection:
         WHERE TABLE_NAME = ?
         ORDER BY ORDINAL_POSITION
         """
-        rows = cur.execute(sql, self.table).fetchall()
+        rows = cur.execute(sql, self._safe_table()).fetchall()
         
         schema = []
         for row in rows:
@@ -758,14 +742,15 @@ class DatabaseConnection:
         schema = self.get_table_schema()
         all_columns = [col["name"] for col in schema]
         
-        # Construir SELECT dinámicamente
-        cols_sql = ", ".join(f"[{col}]" for col in all_columns)
+        # Construir SELECT dinámicamente (con identificadores sanitizados)
+        safe_table = self._safe_table()
+        cols_sql = ", ".join(f"[{self._safe_column(col)}]" for col in all_columns)
         
         # Construir WHERE dinámicamente
-        where_parts = [f"[{col}] = ?" for col in key_columns]
+        where_parts = [f"[{self._safe_column(col)}] = ?" for col in key_columns]
         where_sql = " AND ".join(where_parts)
         
-        sql = f"SELECT {cols_sql} FROM [{self.table}] WHERE {where_sql}"
+        sql = f"SELECT {cols_sql} FROM [{safe_table}] WHERE {where_sql}"
         
         cur = self._cursor()
         row = cur.execute(sql, *key_values).fetchone()
