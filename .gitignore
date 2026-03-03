@@ -37,8 +37,7 @@ ehthumbs.db
 *.orig
 
 # Scripts de test/diagnostico
-# Los tests se mueven a la carpeta /tests
-tests/
+# tests/ NO se ignora — los tests deben estar en el repo
 
 # Build / dist
 build/
@@ -60,7 +59,7 @@ dist/
 # PyInstaller (compilación)
 build/
 dist/
-*.spec
+# No ignorar EditorScript.spec — es necesario para compilar
 
 # Apuntes personales
 docs/APUNTES_PROYECTO.md

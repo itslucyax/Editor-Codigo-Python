@@ -7,25 +7,45 @@ Diseñado como reemplazo del editor básico integrado en la aplicación de escri
 
 ## 1. Lanzamiento
 
-El editor se abre automáticamente cuando se hace clic en **"Editar script"** desde la aplicación principal. No es necesario ejecutar ningún comando manualmente.
+El editor se abre automáticamente cuando se hace clic en **"Editar script"** desde la aplicación principal (Gestión 21). No es necesario ejecutar ningún comando manualmente.
+
+### Modo recomendado: Cadena de conexión
+
+La forma más sencilla de lanzar el editor es con `--connection-string`. Gestión 21 usa un **formato extendido** donde el campo `database` incluye modelo y tipo:
+
+```
+EditorScript.exe --connection-string "driver={SQL Server};server=miservidor\SQLEXPRESS;uid=mi_usuario;pwd=mi_clave;database=MiBaseDatos T01 D"
+```
+
+El editor auto-detecta:
+- **Base de datos real**: `MiBaseDatos`
+- **Modelo**: `T01`
+- **Tipo**: `D` = Documento, `P` = Plantilla (determina la tabla automáticamente)
 
 ### Parámetros disponibles
 
 | Parámetro | Obligatorio | Por defecto | Descripción |
 |-----------|:-----------:|-------------|-------------|
-| `--server` | Sí* | — | Servidor SQL Server (ej: `srv\sql2019`) |
-| `--database` | Sí* | — | Nombre de la base de datos |
-| `--user` | Sí* | — | Usuario SQL Authentication |
-| `--password` | Sí* | — | Contraseña SQL Authentication |
-| `--table` | No | `G_SCRIPT` | Nombre de la tabla |
-| `--key-columns` | Sí* | — | Columnas clave separadas por coma (ej: `MODELO,CODIGO`) |
-| `--key-values` | Sí* | — | Valores de la clave separados por coma (ej: `T01,BOBINADO`) |
+| `--connection-string` | Sí* | — | Cadena de conexión completa (ODBC o formato Gestión 21) |
+| `--tipo` | No | auto | `documento` o `plantilla` (auto-detectado si la cadena usa flag D/P) |
+| `--key-columns` | No | `MODELO,CODIGO` | Columnas clave separadas por coma |
+| `--key-values` | No | auto | Valores de la clave (auto-detectados desde la cadena si tiene modelo) |
+| `--table` | No | según tipo | `G_SCRIPT` (documento) o `G_SCRIPT_PLANTILLA` (plantilla) |
 | `--content-column` | No | `SCRIPT` | Columna que contiene el código VBS |
 | `--editable-columns` | No | — | Columnas editables desde el sidebar (separadas por coma) |
-| `--driver` | No | autodetectado | Driver ODBC (ej: `ODBC Driver 18 for SQL Server`) |
-| `--config` | No | — | Ruta a archivo JSON de configuración |
+| `--driver` | No | autodetectado | Driver ODBC (se detecta el mejor disponible) |
+| `--config-file` | No | — | Ruta a archivo JSON de configuración |
 
-\* Obligatorio solo para conexión a BD. Sin estos parámetros el editor arranca en **modo local**.
+**Parámetros individuales** (compatibilidad con versiones anteriores):
+
+| Parámetro | Descripción |
+|-----------|-------------|
+| `--server` | Servidor SQL Server (ej: `miservidor\SQLEXPRESS`) |
+| `--database` | Nombre de la base de datos |
+| `--user` | Usuario SQL Authentication |
+| `--password` | Contraseña SQL Authentication |
+
+\* Se necesita `--connection-string` O los 4 parámetros individuales (server, database, user, password). Sin ninguno, el editor arranca en **modo local**.
 
 ### Modo local (sin BD)
 
@@ -37,20 +57,27 @@ En lugar de pasar todos los parámetros por línea de comandos, se puede crear u
 
 ```json
 {
-  "server": "srv\\sql2019",
-  "database": "MI_BD",
-  "user": "usuario",
-  "password": "clave",
-  "table": "G_SCRIPT",
-  "key_columns": ["MODELO", "CODIGO"],
-  "key_values": ["T01", "BOBINADO"],
-  "content_column": "SCRIPT"
+  "connection": {
+    "server": "miservidor\\SQLEXPRESS",
+    "database": "MiBaseDatos",
+    "user": "mi_usuario",
+    "password": "mi_clave",
+    "table": "G_SCRIPT",
+    "content_column": "SCRIPT"
+  },
+  "script": {
+    "key_columns": ["MODELO", "CODIGO"],
+    "key_values": ["T01", "BOBINADO"],
+    "editable_columns": ["GRUPO", "DESCRIPCION"]
+  }
 }
 ```
 
-Y lanzar con: `editor.exe --config config.json`
+Y lanzar con: `EditorScript.exe --config-file config.json`
 
 La prioridad de configuración es: **Línea de comandos > Variables de entorno > Archivo JSON**.
+
+Ver `tests/editor_config.example.json` para un ejemplo completo.
 
 ---
 
@@ -58,30 +85,29 @@ La prioridad de configuración es: **Línea de comandos > Variables de entorno >
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  Editor VBS - T01 / BOBINADO                         [─] [□] [×]│
+│ Editor VBS — T01 / BOBINADO                         [─] [□] [×]  │
 ├────────────┬─────────────────────────────────────────────────────┤
-│            │ [ Mostrar SCRIPT ▼  T01/BOBINADO              ]    │
-│  MODELO    │ ┌─ Buscar: [________________] [▼] [▲] [n/N]  ──┐  │
-│  T01       │ │                                               │  │
-│            │ │ 01 │ If var0="X" Then                         │  │
-│  CODIGO    │ │ 02 │     r="\\DILOERP\in2$\DATOS\BOB.GIF"    │  │
-│  BOBINADO  │ │ 03 │ End If                                   │  │
-│            │ │ 04 │                                           │  │
-│  TIPO      │ │ 05 │ ' Este es un comentario                  │  │
-│  T - OT    │ │ 06 │ Dim resultado                            │  │
-│            │ │ 07 │ resultado = MsgBox("Hola")               │  │
-│  GRUPO     │ │    │                                           │  │
-│  [_______] │ │    │                                           │  │
-│            │ │    │                                           │  │
-│ ────────── │ │    │                                           │  │
-│ Var 0 [__] │ │    │                                           │  │
-│ Var 1 [__] │ │    │                                           │  │
-│ Var 2 [__] │ │    │                                           │  │
-│ Var 3 [__] │ │    │                                           │  │
-│ ...        │ └────┘                                           │  │
-│ Var 9 [__] │                                                     │
-├────────────┴─────────────────────────────────────────────────────┤
-│  SQL (T01/BOBINADO)  |  Línea: 1  Col: 1  |  Guardado           │
+│            │  [▾ SCRIPT ▾  T01/BOBINADO                      ]   │
+│  MODELO    ├─────────────────────────────────────────────────────┤
+│  T01       │  Buscar: [________________] [▼] [▲]  3/12           │
+│            ├─────┬───────────────────────────────────────────────┤
+│  CODIGO    │  01 │ If var0="X" Then                              │
+│  BOBINADO  │  02 │     r="\\server\ruta\datos\BOB.GIF"           │
+│            │  03 │ End If                                        │
+│  TIPO      │  04 │                                               │
+│  T - OT    │  05 │ ' Este es un comentario                       │
+│            │  06 │ Dim resultado                                 │
+│  GRUPO     │  07 │ resultado = MsgBox("Hola")                    │
+│  [_______] │     │                                               │
+│            │     │                                               │
+│ ────────── │     │                                               │
+│ Var 0 [__] │     │                                               │
+│ Var 1 [__] │     │                                               │
+│ Var 2 [__] │     │                                               │
+│ ...        │     │                                               │
+│ Var 9 [__] │     │                                               │
+├────────────┴─────┴───────────────────────────────────────────────┤
+│ [Documento] T01/BOBINADO  │  Línea: 1  Col: 1  │  Guardado       │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -217,7 +243,8 @@ Todo se envía en un solo `UPDATE` a la base de datos.
 
 | Indicador en la barra de estado | Significado |
 |---------------------------------|-------------|
-| `SQL (T01/BOBINADO)` | Conectado a BD, editando script T01/BOBINADO |
+| `[Documento] T01/BOBINADO` | Conectado a BD en modo documento |
+| `[Plantilla] T01/BOBINADO` | Conectado a BD en modo plantilla |
 | `Local` | Sin conexión a BD, modo de prueba |
 | `Modificado` | Hay cambios sin guardar |
 | `Guardado` | Sin cambios pendientes |
@@ -263,26 +290,29 @@ Pulsar **Ctrl+G** abre un diálogo donde se puede escribir un número de línea.
 ### El editor no arranca
 
 **Posible causa**: Falta el driver ODBC de SQL Server.  
-**Solución**: Instalar "ODBC Driver 17 for SQL Server" o "ODBC Driver 18 for SQL Server" desde la web de Microsoft. El editor detecta automáticamente el driver disponible.
+**Solución**: Instalar cualquier driver ODBC para SQL Server. El editor auto-detecta el mejor disponible (`ODBC Driver 18` > `ODBC Driver 17` > `SQL Server`).
 
 ### Error de conexión al arrancar
 
 **Posibles causas**:
 - Servidor SQL Server inaccesible (verificar red y nombre del servidor).
-- Credenciales incorrectas (verificar `--user` y `--password`).
-- Driver ODBC no instalado.
+- Credenciales incorrectas (verificar `uid`/`pwd` en la cadena de conexión, o `--user`/`--password`).
+- Driver ODBC no instalado (el editor auto-detecta `SQL Server`, `ODBC Driver 17` u `ODBC Driver 18`).
 
-**Solución**: Si el Driver 18 no funciona, probar con: `--driver "ODBC Driver 17 for SQL Server"`.
+**Solución**: Verificar conectividad de red al servidor. Comprobar que hay al menos un driver ODBC instalado.
+
+### Error al parsear la cadena de conexión
+
+**Causa**: La cadena no tiene el formato esperado `clave=valor;clave=valor`.
+**Solución**: Verificar que la cadena sigue el formato ODBC:
+```
+driver={SQL Server};server=miservidor\SQLEXPRESS;uid=mi_usuario;pwd=mi_clave;database=MiBaseDatos T01 D
+```
 
 ### El editor abre pero no carga el script
 
 **Posible causa**: Los valores de las claves no coinciden con ningún registro de la tabla.  
-**Solución**: Verificar que `--key-values` sea exactamente igual a los datos en BD (mayúsculas, espacios, etc.).
-
-### Error `42S22` al cargar o guardar
-
-**Causa**: La columna especificada en `--content-column` no existe en la tabla.  
-**Solución**: Verificar el nombre exacto de la columna en SQL Server. El valor por defecto es `SCRIPT`.
+**Solución**: Si usas formato extendido, el modelo se detecta automáticamente de la cadena. Verificar que exista un registro con esa clave en la tabla correspondiente.
 
 ### El guardado avisa "0 filas actualizadas"
 

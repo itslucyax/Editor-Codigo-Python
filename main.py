@@ -263,7 +263,10 @@ O simplemente:
     # ========================================================================
     try:
         config.validate_connection_config()
-        config.validate_script_config()
+        # Si usamos connection string, key_columns/key_values pueden venir
+        # del formato extendido (Gestión 21), así que no validamos todavía.
+        if not final_config.get("connection_string"):
+            config.validate_script_config()
     except ValueError as e:
         logger.error("Configuración incompleta: %s", e)
         print(f"\nERROR: {e}\n", file=sys.stderr)
@@ -306,6 +309,17 @@ O simplemente:
                 table_map=custom_table_map,
                 content_column=final_config.get("content_column", "SCRIPT"),
             )
+            # Si la cadena tiene formato extendido (Gestión 21) se auto-detecta
+            # el tipo y el MODELO. Actualizar contexto y key_values.
+            if db.context_type:
+                context_type = db.context_type
+            if db.modelo:
+                logger.info("MODELO auto-detectado de la cadena: %s", db.modelo)
+                # Si no se dieron key_columns/key_values explícitos, auto-configurar
+                if not final_config.get("key_columns"):
+                    final_config["key_columns"] = ["MODELO", "CODIGO"]
+                if not final_config.get("key_values"):
+                    final_config["key_values"] = [db.modelo, ""]
         else:
             # ---- Modo parámetros individuales (compatibilidad) ----
             resolved_table = resolve_table_for_context(
@@ -341,6 +355,23 @@ O simplemente:
         # Cargar registro completo con TODOS los campos
         key_columns = final_config["key_columns"]
         key_values = final_config["key_values"]
+        
+        # Si solo tenemos MODELO (sin CODIGO), cargar la lista de scripts
+        # y usar el primero como registro por defecto.
+        has_empty_key = any(v == "" for v in key_values)
+        
+        if has_empty_key and len(key_columns) >= 2:
+            logger.info("CODIGO no especificado, cargando lista de scripts para MODELO=%s", key_values[0])
+            scripts_list = db.get_scripts_for_model(key_columns, key_values)
+            if scripts_list:
+                # Usar el primer script disponible como registro inicial
+                first = scripts_list[0]
+                key_values = first["key_values"]
+                final_config["key_values"] = key_values
+                logger.info("Registro inicial auto-seleccionado: %s", 
+                           ", ".join(f"{k}={v}" for k, v in zip(key_columns, key_values)))
+            else:
+                logger.warning("No se encontraron scripts para MODELO=%s", key_values[0])
         
         logger.info("Cargando registro: %s", 
                     ", ".join(f"{k}={v}" for k, v in zip(key_columns, key_values)))

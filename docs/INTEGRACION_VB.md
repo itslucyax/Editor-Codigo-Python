@@ -8,7 +8,62 @@ El editor es **completamente independiente**: tu aplicación solo necesita lanza
 
 ---
 
-## Método 1: Generar archivo JSON y lanzar (RECOMENDADO)
+## Método 1: Cadena de conexión (RECOMENDADO para Gestión 21)
+
+El método más sencillo. Tu aplicación VB pasa la cadena de conexión completa y el editor auto-detecta todo (base de datos, modelo, tipo documento/plantilla).
+
+### Formato extendido de Gestión 21
+
+Gestión 21 usa un formato especial donde el campo `database` contiene información adicional:
+```
+database=MiBaseDatos T01 D
+         ^^^^^^^^^^ ^^^ ^
+         BD real    MOD FLAG (D=Documento, P=Plantilla)
+```
+
+### En VB.NET:
+
+```vb
+Private Sub btnEditarScript_Click(sender As Object, e As EventArgs) Handles btnEditarScript.Click
+    Dim editorPath As String = "C:\Aplicaciones\EditorScript.exe"
+    
+    ' Gestión 21 ya tiene la cadena de conexión con formato extendido
+    Dim connectionString As String = ObtenerCadenaConexionGestion21()
+    ' Ejemplo: "driver={SQL Server};server=miservidor\SQLEXPRESS;uid=mi_usuario;pwd=mi_clave;database=MiBaseDatos T01 D"
+    
+    Dim proceso As New Process()
+    proceso.StartInfo.FileName = editorPath
+    proceso.StartInfo.Arguments = $"--connection-string ""{connectionString}"""
+    proceso.StartInfo.UseShellExecute = False
+    proceso.Start()
+    
+    ' Esperar a que el usuario termine
+    proceso.WaitForExit()
+    
+    ' Recargar datos si necesario
+    RecargarDatosGrid()
+End Sub
+```
+
+### En VB6:
+
+```vb
+Private Sub cmdEditarScript_Click()
+    Dim editorPath As String
+    Dim connStr As String
+    
+    editorPath = "C:\Aplicaciones\EditorScript.exe"
+    connStr = ObtenerCadenaConexionGestion21()
+    
+    Shell editorPath & " --connection-string """ & connStr & """", vbNormalFocus
+End Sub
+```
+
+**El editor auto-detecta**: base de datos real (`MiBaseDatos`), modelo (`T01`), y tipo (`documento` o `plantilla`) desde la cadena.
+
+---
+
+## Método 2: Generar archivo JSON y lanzar (Más flexible)
 
 ### En tu aplicación VB.NET:
 
@@ -105,7 +160,7 @@ End Class
 
 ---
 
-## Método 2: Variables de entorno (Más simple, menos flexible)
+## Método 3: Variables de entorno (Más simple, menos flexible)
 
 ### En VB.NET:
 
@@ -129,7 +184,7 @@ End Sub
 
 ---
 
-## Método 3: Parámetros de línea de comandos (Menos seguro - password visible)
+## Método 4: Parámetros de línea de comandos (Menos seguro - password visible)
 
 ```vb
 Private Sub AbrirEditor(modelo As String, codigo As String)
@@ -410,13 +465,13 @@ R: Revisa el código de salida del proceso o consulta el log en `%APPDATA%\Edito
 Para distribuir el editor con tu aplicación VB:
 
 1. **Compilar a .exe** usando PyInstaller:
-   ```bash
+   ```powershell
    pip install pyinstaller
-   pyinstaller --onefile --windowed main.py
+   pyinstaller EditorScript.spec
    ```
 
 2. **Incluir en tu instalador** (InnoSetup, WiX, etc.)
 3. **Configurar path** en `app.config` de tu aplicación VB
 4. **Listo**: Tu aplicación lo llama transparentemente
 
-¿Necesitas ayuda con algún aspecto específico de la integración?
+El .exe resultante no necesita Python instalado en el equipo destino. Solo requiere un driver ODBC para SQL Server (se auto-detecta el mejor disponible).

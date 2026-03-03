@@ -2,28 +2,34 @@
 
 ## Visión general
 
-Aplicación de escritorio Python con tres capas bien delimitadas: interfaz gráfica (Tkinter), resaltado de sintaxis (Pygments) y acceso a datos (pyodbc → SQL Server). La comunicación entre capas siempre va de arriba hacia abajo; `db/`no sabe nada de la UI y `syntax/` no sabe nada de la DB.
+Aplicación de escritorio Python con tres capas bien delimitadas: interfaz gráfica (Tkinter), resaltado de sintaxis (Pygments) y acceso a datos (pyodbc → SQL Server). La comunicación entre capas siempre va de arriba hacia abajo; `db/` no sabe nada de la UI y `syntax/` no sabe nada de la DB.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         main.py                                  │
 │                    (Punto de entrada)                            │
-│                   Parsea argumentos CLI                          │
+│              Parsea argumentos CLI + config multi-fuente         │
 └───────────────────────────┬─────────────────────────────────────┘
                             │
-            ┌───────────────┼───────────────┐
-            ▼               ▼               ▼
-     ┌──────────┐    ┌──────────┐    ┌──────────┐
-     │   db/    │    │ editor/  │    │ config   │
-     │connection│◄───│   app    │───►│  .py     │
-     └──────────┘    └────┬─────┘    └──────────┘
-                          │
-              ┌───────────┼───────────┐
-              ▼           ▼           ▼
-        ┌──────────┐ ┌──────────┐ ┌──────────┐
-        │  text_   │ │  line_   │ │  syntax/ │
-        │  editor  │ │ numbers  │ │ highlight│
-        └──────────┘ └──────────┘ └──────────┘
+        ┌───────────────────┼───────────────────┐
+        ▼                   ▼                   ▼
+ ┌──────────────┐    ┌──────────┐    ┌──────────────┐
+ │     db/      │    │ editor/  │    │ config.py    │
+ │ connection   │◄───│   app    │───►│config_loader │
+ │ (parse_conn  │    └────┬─────┘    └──────────────┘
+ │  _string)    │         │
+ └──────────────┘    ┌────┼────────────────┐
+                     ▼    ▼         ▼      ▼
+              ┌────────┐┌──────┐┌───────┐┌──────────┐
+              │ text_  ││line_ ││search_││ sidebar  │
+              │ editor ││number││ bar   ││ + script │
+              └────────┘└──────┘└───────┘│ selector │
+                     │                   └──────────┘
+                     ▼
+              ┌──────────┐
+              │  syntax/ │
+              │ highlight│
+              └──────────┘
 ```
 ---
 
@@ -31,32 +37,40 @@ Aplicación de escritorio Python con tres capas bien delimitadas: interfaz gráf
 
 ### main.py - Bootstrap
 
-Punto de entrada. Parsea argumentos con `argparse`, instancia `DatabaseConnection`, carga el script con `get_script()`, lanza `EditorApp` y cierrra la conexión al salir del script `mainloop`. Si faltan parámetros de DB, arranca en modo local con un script de ejemplo hardcodeado.
+Punto de entrada. Usa `argparse` para recibir parámetros CLI, `ConfigLoader` para combinar configuración de múltiples fuentes (CLI > ENV > JSON), y lanza la conexión y el editor.
 
-Si `connect()` o `get_script()` lanzan excepción, termina con `sys.exit(1)` y el error va a stderr.
+Soporta dos modos de conexión:
+1. **Cadena de conexión** (`--connection-string`): El parser extrae automáticamente server, database, user, password, y en formato extendido Gestión 21 también MODELO y tipo (D/P).
+2. **Parámetros individuales** (`--server`, `--database`, etc.): Compatibilidad con versiones anteriores.
 
----
+Si no hay configuración de BD, arranca en **modo local** con un script de ejemplo.
 
 ```python
 # Flujo principal
 1. Parsear argumentos CLI (argparse)
-2. Crear conexión a BD (DatabaseConnection)
-3. Cargar script desde BD (get_script)
-4. Crear ventana del editor (EditorApp)
-5. Ejecutar loop principal (mainloop)
-6. Cerrar conexión al salir
+2. Cargar configuración multi-fuente (ConfigLoader: JSON → ENV → CLI)
+3. Crear conexión a BD:
+   a) Desde connection string → parse_connection_string() → from_connection_string()
+   b) Desde parámetros individuales → DatabaseConnection(server=..., ...)
+4. Detectar contexto (Documento/Plantilla) y resolver tabla
+5. Conectar y cargar registro completo (get_record_full)
+6. Crear ventana del editor (EditorApp)
+7. Ejecutar loop principal (mainloop)
+8. Cerrar conexión al salir (try/finally)
 ```
 
-**Argumentos que procesa**:
-- `--server`, `--database`, `--modelo`, `--codigo`
-- `--content-column`, `--user`, `--password`
-- `--table`, `--driver`
+**Argumentos principales**:
+- `--connection-string`: Cadena de conexión completa (formato ODBC, ADO.NET o Gestión 21)
+- `--tipo`: `documento` o `plantilla` (auto-detectado si la cadena usa formato extendido)
+- `--key-columns`, `--key-values`: Claves del registro
+- `--config-file`: Archivo JSON con toda la configuración
+- `--server`, `--database`, `--user`, `--password`: Parámetros individuales (compatibilidad)
 
 ---
 
 ### config.py - Constantes visuales
 
-Único punto de configuración para colores y fuente. Todaslas constantes son strings o tuplas importadas directamente por los módulos que las necesitan. Cambiar un color aquí afecta a todos los componentes sin tocar nada más.
+Único punto de configuración para colores y fuente. Todas las constantes son strings o tuplas importadas directamente por los módulos que las necesitan. Cambiar un color aquí afecta a todos los componentes sin tocar nada más.
 
 ```python
 # Colores del tema oscuro
@@ -67,49 +81,109 @@ COLOR_STRING       = "#ce9178"   # Cadenas
 COLOR_COMMENT      = "#6a9955"   # Comentarios
 # ... etc
 
-# Separador entre sidebar y editor
-COLOR_SEPARADOR    = "#555"      # Línea divisoria vertical
-SEPARADOR_ANCHO    = 1            # Ancho en píxeles de la línea divisoria
-
 # Fuente
 FUENTE_EDITOR      = ("Consolas", 12)
 ```
 
-**Ventaja**: Cambiar colores en un solo lugar afecta a todo el editor.
+---
+
+### config_loader.py - Configuración multi-fuente
+
+Carga y combina configuración de tres fuentes con prioridad: **CLI > ENV > JSON**.
+
+```python
+class ConfigLoader:
+    def load_from_file(path)     # Carga desde JSON
+    def load_from_env()          # Carga desde variables EDITOR_*
+    def merge(cli_args)          # Combina todo, CLI tiene prioridad
+    def validate_connection_config()  # Valida datos mínimos
+    def validate_script_config()      # Valida key_columns/key_values
+```
+
+Variables de entorno soportadas: `EDITOR_SERVER`, `EDITOR_DATABASE`, `EDITOR_CONNECTION_STRING`, `EDITOR_TIPO`, etc.
 
 ---
 
 ### db/connection.py - Acceso a datos
 
-**Clase principal**: `DatabaseConnection`
+**Módulo central de conexión a SQL Server.** Incluye:
 
-Encapsula la conexión pyodbc y las dos únicas operaciones que necesita el editor: leer y escribir un script. La tabla y la columna de contenido son configurables en tiempo de ejecución vía argumentos CLI.
+#### Funciones de módulo
 
-Usa SQL Authentication (`UID`/`PWD`). No soporta Windows Authentication. La conexión se abre con `autocommit=False`; el commit se hace explícitamente en `save_script()` tras comprobar `rowcount`.
+- `parse_connection_string(conn_str)`: Parsea cadenas ODBC, ADO.NET y **formato extendido Gestión 21** (donde `database=MiBaseDatos T01 D` se descompone en database, MODELO y tipo D/P).
+- `resolve_table_for_context(context_type)`: Mapea `"documento"` → `G_SCRIPT`, `"plantilla"` → `G_SCRIPT_PLANTILLA`.
+- `detect_odbc_driver()`: Auto-detecta el mejor driver ODBC instalado.
+- `_sanitize_identifier(name)`: Previene inyección SQL en nombres de tabla/columna.
+
+#### Clase `DatabaseConnection`
 
 ```python
 class DatabaseConnection:
-    def __init__(server, database, table, user, password, content_column, ...)
-    def connect()                    # Abre conexión pyodbc
-    def close()                      # Cierra conexión
-    def get_script(modelo, codigo)   # SELECT del script
-    def save_script(modelo, codigo, content)  # UPDATE del script
+    # Constructores
+    def __init__(server, database, table, user, password, driver, context_type, modelo, ...)
+    @classmethod
+    def from_connection_string(conn_str, context_type, ...)  # Parsea y crea
+
+    # Context manager
+    def __enter__()  →  connect() + return self
+    def __exit__()   →  close()
+
+    # Conexión
+    def connect()    # Abre conexión pyodbc (auto-detecta driver)
+    def close()      # Cierra conexión
+
+    # Lectura dinámica
+    def get_table_schema()                    # INFORMATION_SCHEMA → lista de columnas
+    def get_record_full(key_columns, key_values)  # SELECT * dinámico
+    def get_scripts_for_model(...)            # Lista de scripts para el desplegable
+
+    # Escritura dinámica
+    def save_record_full(key_columns, key_values, updated_fields)  # UPDATE dinámico
+
+    # Variables Var0-Var9
+    def get_variables(modelo, codigo)         # Lee TABLACAMPO0-9 + GRUPO
+
+    # Contexto
+    def switch_context(new_context)           # Cambio Documento ↔ Plantilla en caliente
+    @property is_documento / is_plantilla
 ```
 
-**Errores que puede lanzar:**
+**Seguridad:**
+- Todos los identificadores SQL (tabla, columna) pasan por `_sanitize_identifier()` que rechaza caracteres peligrosos
+- Los valores se pasan siempre como parámetros `?` (nunca concatenados)
+- `autocommit=False`, commit explícito tras verificar `rowcount`
+
+**Formato extendido Gestión 21:**
+
+```
+"database=MiBaseDatos T01 D"
+         ───────────  ─── ─
+         BD real      MOD TIP
+```
+
+El parser detecta que el último token es `D` o `P` y extrae automáticamente:
+- `database` → `"MiBaseDatos"` (nombre real de la BD)
+- `modelo` → `"T01"` (código del modelo)
+- `tipo` → `"documento"` (D) o `"plantilla"` (P)
 
 | Situación | Excepción |
 |-----------|-----------|
 | Faltan `--user` o `--password` | `ValueError` |
 | No se puede conectar al servidor | `ConnectionError` (wrappea `pyodbc.Error`) |
-| Script no encontrado en BD | `LookupError` |
-| Columna `--content-column` no existe | `LookupError` (error ODBC `42S22`) |
+| Registro no encontrado en BD | `LookupError` |
+| Columna no existe | `LookupError` (error ODBC `42S22`) |
+| Cadena de conexión vacía o inválida | `ValueError` |
+| Contexto no válido | `ValueError` |
+| Identificador SQL peligroso | `ValueError` (sanitización) |
 
-**SQL generado** (parámetros tipados, sin concatenación de strings):
+**SQL generado** (identificadores sanitizados, valores como parámetros `?`):
 
 ```sql
-SELECT [SCRIPT] FROM [G_SCRIPT] WHERE [MODELO] = ? AND [CODIGO] = ?
-UPDATE [G_SCRIPT] SET [SCRIPT] = ? WHERE [MODELO] = ? AND [CODIGO] = ?
+-- Lectura dinámica
+SELECT [MODELO], [CODIGO], [SCRIPT], ... FROM [G_SCRIPT] WHERE [MODELO] = ? AND [CODIGO] = ?
+
+-- Escritura dinámica (solo campos modificados)
+UPDATE [G_SCRIPT] SET [SCRIPT] = ?, [GRUPO] = ? WHERE [MODELO] = ? AND [CODIGO] = ?
 ```
 
 ---
@@ -118,21 +192,25 @@ UPDATE [G_SCRIPT] SET [SCRIPT] = ? WHERE [MODELO] = ? AND [CODIGO] = ?
 
 **Clase principal**: `EditorApp` (`tk.Tk`)
 
-Monta la ventana, conecta los componentes y gestiona los eventos de alto nivel. No hace queries ni tokeniza; delega en `DatabaseConnection` y `TextEditor`.
+Monta la ventana, conecta los componentes y gestiona los eventos de alto nivel. Recibe `context_type` para mostrar "Documento" o "Plantilla" en el título.
 
 Estructura de la ventana:
-- `Frame` principal con `TextEditor` (derecha) y `LineNumbers` (izquierda)  layout `pack`
-- `Label` de barra de estado anclado al fondo (`side="bottom"`)
+- `Sidebar` (izquierda): Campos del registro (readonly / editables) + variables Var0-9
+- `ScriptSelector` (arriba): Desplegable para cambiar de script
+- `SearchBar` / `FixedSearchBar` (arriba del editor): Buscar y reemplazar
+- `TextEditor` + `LineNumbers` (centro): Área de edición con resaltado
+- `Label` barra de estado (fondo): Contexto, cursor, estado
 
 ```python
 class EditorApp(tk.Tk):
-    def __init__(inicial_text, db, modelo, codigo)
-    
+    def __init__(inicial_text, db, record, key_columns, content_column,
+                 editable_columns, scripts_list, context_type)
+
     # Métodos principales
-    def _guardar()       # Ctrl+S → save_script()
+    def _guardar()       # Ctrl+S → save_record_full()
     def _on_cerrar()     # Confirmar antes de cerrar
     def _update_status() # Actualizar barra de estado
-    
+
     # Atajos de teclado
     def _seleccionar_todo()  # Ctrl+A
     def _deshacer()          # Ctrl+Z
@@ -140,22 +218,29 @@ class EditorApp(tk.Tk):
 ```
 
 **Componentes que contiene**:
+- `Sidebar`: Panel lateral dinámico con campos del registro
+- `ScriptSelector`: Desplegable de scripts (cambia sin cerrar ventana)
 - `TextEditor`: Área de edición
 - `LineNumbers`: Números de línea
+- `SearchBar`: Buscar y reemplazar (Ctrl+F / Ctrl+H)
 - `Label`: Barra de estado
 
-Atajos registrados con `bind_all` para que funciones independientemente del foco:
+Atajos registrados con `bind_all`:
 
 | Atajo | Método |
 |-------|--------|
-| `Ctrl+S` | `_guardar()` |
+| `Ctrl+S` | `_guardar()` — guarda script + campos editables |
 | `Ctrl+Z` | `_deshacer()` → `edit_undo()` |
 | `Ctrl+Y` | `_rehacer()` → `edit_redo()` |
 | `Ctrl+A` | `_seleccionar_todo()` |
+| `Ctrl+F` | Abrir barra de búsqueda |
+| `Ctrl+H` | Abrir buscar y reemplazar |
+| `Ctrl+G` | Ir a línea |
+| `F3` / `Shift+F3` | Siguiente / anterior coincidencia |
 
-El cierre se intercepta con `protocol("WM_DELETE_WINDOW", _on_cerrar)`. Si `edit_modified()` devuelve `True`, muestra diálogo `askyesnocancel` antes de destruir la ventana.
+El cierre se intercepta con `protocol("WM_DELETE_WINDOW", _on_cerrar)`. Si hay cambios sin guardar, muestra diálogo `askyesnocancel`.
 
-La barra de estado se actualiza en `_update_status()`, enlazada a `<<Change>>`, `<KeyRelease>` y `<ButtonRelease-1>`. Muestra origen (`SQL (MODELO/CODIGO)` o `Local`), posición del cursor (`línea.col`) y estado de modificación.
+La barra de estado muestra: contexto (Documento/Plantilla), posición del cursor y estado de modificación.
 
 ---
 
@@ -270,15 +355,38 @@ El cálculo de posiciones se hace en coordenadas `línea.columna` en lugar de of
 
 ## Flujos principales
 
-### Apertura
+### Apertura (modo cadena de conexión)
 
 ```
-CLI args → main.py → DatabaseConnection.connect()    # pyodbc abre conexión
-                   → DatabaseConnection.get_script() # SELECT, normaliza CRLF→LF
-                   → EditorApp(contenido)
-                   → TextEditor.set_content()  # strip \n + insert
-                   → VBHighlighter.highlight() # primer pintado
-                   → LineNumbers.redraw()      # primer dibujado
+Gestión 21 ejecuta: editor.exe --connection-string "driver=...;database=MiBaseDatos T01 D" --key-columns "MODELO,CODIGO" --key-values "T01,BOBINADO"
+    │
+    ▼
+main.py → argparse recibe --connection-string
+    │
+    ▼
+ConfigLoader → merge(CLI > ENV > JSON)
+    │
+    ▼
+parse_connection_string("...database=MiBaseDatos T01 D")
+    → database="MiBaseDatos", modelo="T01", tipo="documento"
+    │
+    ▼
+DatabaseConnection.from_connection_string()
+    → tabla resuelta: G_SCRIPT (porque tipo=documento)
+    │
+    ▼
+db.connect() → pyodbc.connect(...)     # Conexión real a SQL Server
+    │
+    ▼
+db.get_record_full(["MODELO","CODIGO"], ["T01","BOBINADO"])
+    → SELECT * FROM G_SCRIPT WHERE MODELO='T01' AND CODIGO='BOBINADO'
+    │
+    ▼
+EditorApp(text=record["SCRIPT"], context_type="documento")
+    → Sidebar muestra campos del registro
+    → ScriptSelector carga lista de scripts del mismo MODELO
+    → TextEditor muestra el script con resaltado
+    → Barra de estado: [Documento] T01/BOBINADO
 ```
 
 ### Guardado (Ctrl+S)
@@ -286,10 +394,11 @@ CLI args → main.py → DatabaseConnection.connect()    # pyodbc abre conexión
 ```
 Usuario pulsa Ctrl+S
     → EditorApp._guardar()
-    → TextEditor.get("1.0", "end-1c")
-    → DatabaseConnection.save_script()
-    → SQL: UPDATE G_SCRIPT SET [SCRIPT]=? WHERE ...
-    → Actualizar barra de estado
+    → Recoger: texto del editor + campos editables del sidebar
+    → db.save_record_full(key_columns, key_values, campos_modificados)
+    → SQL: UPDATE [G_SCRIPT] SET [SCRIPT]=?, [GRUPO]=? WHERE [MODELO]=? AND [CODIGO]=?
+    → Verificar rowcount == 1
+    → Actualizar barra de estado: "Guardado ✓"
 ```
 
 ### Cierre con cambios pendientes
@@ -297,12 +406,13 @@ Usuario pulsa Ctrl+S
 ```
 Usuario cierra ventana
     → EditorApp._on_cerrar()
-    → ¿Modificado? 
+    → ¿Modificado?
         → Sí: Mostrar diálogo
             → "Sí": _guardar() + destroy()
             → "No": destroy()
             → "Cancelar": return (no cierra)
         → No: destroy()
+    → finally: db.close()  (siempre se cierra la conexión)
 ```
 
 ---

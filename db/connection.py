@@ -1,5 +1,5 @@
 """
-Conexión dinámica a SQL Server para leer/guardar scripts.
+Conexión dinamia a SQL Server para leer/guardar scripts.
 
 Soporta:
 - Conexión por parámetros individuales (server, database, user, password)
@@ -73,6 +73,13 @@ DEFAULT_TABLES = {
     CONTEXT_PLANTILLA: "G_SCRIPT_PLANTILLA",
 }
 
+# Mapeo de flags de tipo en la cadena de conexión extendida
+# Gestión 21 usa: "database=MiBaseDatos T01 D" donde D=Documento, P=Plantilla
+_TIPO_FLAG_MAP = {
+    "D": CONTEXT_DOCUMENTO,
+    "P": CONTEXT_PLANTILLA,
+}
+
 
 def detect_odbc_driver() -> str:
     """Detecta el mejor driver ODBC instalado en la máquina.
@@ -125,24 +132,33 @@ _CONN_STR_KEY_MAP = {
 def parse_connection_string(conn_str: str) -> Dict[str, str]:
     """Parsea una cadena de conexión SQL Server y extrae sus componentes.
 
-    Soporta formatos ODBC y ADO.NET:
-        ODBC:    "Driver={ODBC Driver 18 for SQL Server};Server=srv;Database=db;UID=u;PWD=p;"
-        ADO.NET: "Data Source=srv;Initial Catalog=db;User ID=u;Password=p;"
+    Soporta formatos ODBC y ADO.NET, **incluyendo el formato extendido
+    de Gestión 21** donde el valor de ``database`` incluye MODELO y tipo
+    separados por espacios:
+
+        Formato estándar:
+            "Driver={SQL Server};Server=srv;Database=db;UID=u;PWD=p;"
+
+        Formato extendido Gestión 21:
+            "driver={SQL Server};server=miservidor\\SQLEXPRESS;uid=mi_usuario;pwd=mi_clave;database=MiBaseDatos T01 D"
+            → database="MiBaseDatos", modelo="T01", tipo="documento" (D=Documento, P=Plantilla)
 
     Args:
         conn_str: Cadena de conexión completa.
 
     Returns:
-        Diccionario con claves normalizadas:
-        {
-            "driver":   "ODBC Driver 18 for SQL Server",
-            "server":   "miservidor\\instancia",
-            "database": "MiBase",
-            "user":     "sa",
-            "password": "secreto",
-            "trust_server_certificate": "yes",
-            ...  (cualquier clave extra se incluye tal cual)
-        }
+        Diccionario con claves normalizadas::
+
+            {
+                "driver":   "SQL Server",
+                "server":   "miservidor\\SQLEXPRESS",
+                "database": "MiBaseDatos",
+                "user":     "mi_usuario",
+                "password": "mi_clave",
+                # Solo presentes si la cadena usa formato extendido:
+                "modelo":   "T01",
+                "tipo":     "documento",    # (o "plantilla")
+            }
 
     Raises:
         ValueError: Si la cadena está vacía o no tiene formato válido.
@@ -161,16 +177,16 @@ def parse_connection_string(conn_str: str) -> Dict[str, str]:
         if not part or "=" not in part:
             continue
 
-        #Separar en clave=valor (solo en el primer '=')
+        # Separar en clave=valor (solo en el primer '=')
         key, value = part.split("=", 1)
         key = key.strip()
         value = value.strip()
 
-        #Quitar llaves del valor si las tiene (ej: {ODBC Driver 18...})
+        # Quitar llaves del valor si las tiene (ej: {ODBC Driver 18...})
         if value.startswith("{") and value.endswith("}"):
             value = value[1:-1]
 
-        #Normalizar clave
+        # Normalizar clave
         key_upper = key.upper()
         internal_key = _CONN_STR_KEY_MAP.get(key_upper, key.lower().replace(" ", "_"))
 
@@ -181,6 +197,27 @@ def parse_connection_string(conn_str: str) -> Dict[str, str]:
             f"No se pudieron extraer parámetros de la cadena de conexión.\n"
             f"Formato esperado: 'Server=srv;Database=db;UID=user;PWD=pass;'"
         )
+
+    # ------------------------------------------------------------------
+    # Detectar formato extendido de Gestión 21
+    # El valor de 'database' puede contener tokens extra separados por espacio:
+    #   "MiBaseDatos T01 D"    →  database=MiBaseDatos, modelo=T01, tipo=D
+    #   "MiBaseDatos_PLT A P"  →  database=MiBaseDatos_PLT, modelo=A,   tipo=P
+    # El último token es el flag de tipo (D=Documento, P=Plantilla).
+    # El penúltimo es el MODELO.
+    # ------------------------------------------------------------------
+    db_raw = result.get("database", "")
+    tokens = db_raw.split()
+    if len(tokens) >= 3:
+        flag = tokens[-1].upper()
+        if flag in _TIPO_FLAG_MAP:
+            result["database"] = " ".join(tokens[:-2])  # nombre real de la BD
+            result["modelo"] = tokens[-2]                 # ej: "T01", "A"
+            result["tipo"] = _TIPO_FLAG_MAP[flag]         # "documento" o "plantilla"
+            logger.info(
+                "Formato extendido detectado: db=%s, modelo=%s, tipo=%s",
+                result["database"], result["modelo"], result["tipo"],
+            )
 
     # Normalizar trust_server_certificate a booleano-string
     if "trust_server_certificate" in result:
@@ -256,6 +293,7 @@ class DatabaseConnection:
         trust_server_certificate: bool = True,
         content_column: str = "SCRIPT",
         context_type: Optional[str] = None,
+        modelo: Optional[str] = None,
     ):
         self.server = server
         self.database = database
@@ -266,6 +304,7 @@ class DatabaseConnection:
         self.trust_server_certificate = trust_server_certificate
         self.content_column = content_column
         self.context_type = context_type  # 'documento' | 'plantilla' | None
+        self.modelo = modelo              # MODELO extraído de la cadena (o None)
 
         self._cnxn: Optional[pyodbc.Connection] = None
 
@@ -301,10 +340,16 @@ class DatabaseConnection:
         Parsea la cadena, extrae cada componente y resuelve la tabla
         según el contexto de trabajo.
 
+        Si la cadena usa el **formato extendido de Gestión 21**
+        (``database=MiBaseDatos T01 D``), el tipo y el MODELO se detectan
+        automáticamente y tienen prioridad sobre el parámetro *context_type*.
+
         Args:
             conn_str: Cadena de conexión SQL Server.
-                Ej: "Driver={ODBC Driver 18 for SQL Server};Server=srv;Database=db;UID=sa;PWD=123;"
-            context_type: 'documento' o 'plantilla'. Determina la tabla por defecto.
+                Estándar: ``"Driver={SQL Server};Server=srv;Database=db;UID=user;PWD=pass;"´´
+                Extendida: ``"driver={SQL Server};server=miservidor\\SQLEXPRESS;uid=mi_usuario;pwd=mi_clave;database=MiBaseDatos T01 D"``
+            context_type: 'documento' o 'plantilla'. Se usa solo si la cadena
+                          **no** incluye el flag de tipo (D/P).
             table: Si se proporciona, sobrescribe la tabla resuelta por contexto.
             table_map: Mapeo personalizado {contexto: tabla}.
             content_column: Columna que contiene el script.
@@ -317,9 +362,13 @@ class DatabaseConnection:
         """
         params = parse_connection_string(conn_str)
 
+        # Si el parser detectó formato extendido, usar tipo/modelo de la cadena
+        effective_context = params.pop("tipo", None) or context_type
+        modelo = params.pop("modelo", None)
+
         # Resolución de la tabla por contexto
         resolved_table = resolve_table_for_context(
-            context_type, table_override=table, table_map=table_map
+            effective_context, table_override=table, table_map=table_map
         )
 
         # Extraer driver, o auto-detectar
@@ -343,8 +392,9 @@ class DatabaseConnection:
 
         logger.info(
             "DatabaseConnection creada desde connection string: "
-            "server=%s, db=%s, tabla=%s (contexto=%s)",
-            server, database, resolved_table, context_type,
+            "server=%s, db=%s, tabla=%s (contexto=%s, modelo=%s)",
+            server, database, resolved_table, effective_context,
+            modelo or "N/A",
         )
 
         return cls(
@@ -356,7 +406,8 @@ class DatabaseConnection:
             driver=driver,
             trust_server_certificate=trust,
             content_column=content_column,
-            context_type=context_type,
+            context_type=effective_context,
+            modelo=modelo,
         )
 
     # ------------------------------------------------------------------
@@ -450,7 +501,7 @@ class DatabaseConnection:
         updated_fields: dict
     ) -> bool:
         """
-        Guarda cambios en un registro de forma dinámica.
+        Guarda cambios en un registro de forma dinamia.
         
         Args:
             key_columns: Lista de columnas que forman la clave primaria
@@ -719,7 +770,7 @@ class DatabaseConnection:
 
     def get_record_full(self, key_columns: List[str], key_values: List[str]) -> dict:
         """
-        Carga un registro completo con TODAS sus columnas de forma dinámica.
+        Carga un registro completo con TODAS sus columnas de forma dinamica.
         
         Args:
             key_columns: Lista de nombres de columnas que forman la clave (ej: ["MODELO", "CODIGO"])
@@ -738,15 +789,15 @@ class DatabaseConnection:
                 f"key_values tiene {len(key_values)} elementos"
             )
         
-        # Obtener todas las columnas de la tabla
+        #Obtener todas las columnas de la tabla
         schema = self.get_table_schema()
         all_columns = [col["name"] for col in schema]
         
-        # Construir SELECT dinámicamente (con identificadores sanitizados)
+        #Construir SELECT dinamicamente
         safe_table = self._safe_table()
         cols_sql = ", ".join(f"[{self._safe_column(col)}]" for col in all_columns)
         
-        # Construir WHERE dinámicamente
+        #Construir WHERE dinamicamente
         where_parts = [f"[{self._safe_column(col)}] = ?" for col in key_columns]
         where_sql = " AND ".join(where_parts)
         
