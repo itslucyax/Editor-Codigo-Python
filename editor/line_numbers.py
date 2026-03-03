@@ -47,9 +47,9 @@ class LineNumbers(tk.Canvas):
         try:
             # Obtener el número total de líneas para calcular el padding
             total_lines = int(self.text_widget.index('end-1c').split('.')[0])
-            num_digits = len(str(total_lines))
-            # Ancho fijo para la barra azul (puedes ajustar este valor)
-            barra_width = 50 + (num_digits-2)*12
+            num_digits = max(4, len(str(total_lines)))  # Mínimo 4 dígitos (hasta 9999)
+            # Ancho justo para los dígitos + margen cómodo
+            barra_width = 10 + num_digits * 10
             if self.winfo_width() != barra_width:
                 self.configure(width=barra_width)
             # Obtener la primera línea visible

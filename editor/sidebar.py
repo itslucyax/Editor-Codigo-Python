@@ -89,8 +89,9 @@ class Sidebar(tk.Frame):
                 except (ValueError, IndexError):
                     pass
             
-            # El resto son metadata
-            self.metadata_fields.append((field_name, value))
+            # El resto son metadata (excluir TIPO, se muestra aparte)
+            if field_upper != "TIPO":
+                self.metadata_fields.append((field_name, value))
     
     def _build_ui(self):
         """Construye la interfaz completa del sidebar dinámicamente."""
