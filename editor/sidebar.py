@@ -135,16 +135,22 @@ class Sidebar(tk.Frame):
     # Mapeo de la primera letra de MODELO a su significado
     # Fallback hardcoded — si existe tabla de lookup en BD, se puede sobreescribir
     TIPO_MAP = {
-        "T": "Orden de Trabajo",
-        "Q": "Etiqueta",
-        "O": "Oferta",
+        "A": "Albarán de Salida de Almacén",
+        "S": "Albarán de Salida de Facturación",
         "F": "Factura",
-        "U": "U",
-        "P": "P",
-        "L": "L",
-        "R": "R",
-        "A": "A",
-        "S": "S",
+        "O": "Carta de Oferta",
+        "E": "Entrada",
+        "T": "Orden de Trabajo",
+        "P": "Pedido Proveedor",
+        "Q": "Etiqueta",
+        "R": "Recibo",
+        "L": "Documento de Pago",
+        "U": "Solicitud de Cliente",
+        "V": "Solicitud de Proveedor",
+        "X": "Presupuesto",
+        "C": "Pedido Cliente",
+        "H": "Vales Horarios",
+        "Z": "Etiquetas Lotes"
     }
     
     def _build_tipo_section(self):
