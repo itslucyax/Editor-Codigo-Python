@@ -27,6 +27,8 @@ SIN PARÁMETROS: Si ejecutas solo 'python main.py', se abre en modo local sin BD
 
 import argparse
 import sys
+import tkinter as tk
+from tkinter import messagebox
 
 from editor.logger import logger
 from db.connection import (
@@ -39,6 +41,18 @@ from db.connection import (
 )
 from editor.app import EditorApp
 from config_loader import ConfigLoader
+
+def _mostrar_error(titulo: str, mensaje: str):
+    """Muestra un error en ventana gráfica (para cuando no hay consola)."""
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror(titulo, mensaje)
+        root.destroy()
+    except Exception:
+        # Fallback a stderr si Tk falla
+        print(f"\n{titulo}: {mensaje}\n", file=sys.stderr)
+
 
 # Texto de ejemplo si no hay BD
 TEXTO_EJEMPLO = """' Script de ejemplo - Editor VBS
@@ -269,8 +283,7 @@ O simplemente:
             config.validate_script_config()
     except ValueError as e:
         logger.error("Configuración incompleta: %s", e)
-        print(f"\nERROR: {e}\n", file=sys.stderr)
-        parser.print_help()
+        _mostrar_error("Configuración incompleta", str(e))
         sys.exit(1)
     
     # ========================================================================
@@ -388,7 +401,7 @@ O simplemente:
         
     except Exception as e:
         logger.exception("Error fatal durante la carga")
-        print(f"\n❌ ERROR: {e}\n", file=sys.stderr)
+        _mostrar_error("Error de conexión a Base de Datos", str(e))
         sys.exit(1)
     
     # ========================================================================

@@ -12,6 +12,7 @@ from config import (
     COLOR_BARRA_ESTADO_BG,
     COLOR_BARRA_ESTADO_FG,
     COLOR_SEPARADOR,
+    COLOR_SIDEBAR_BG,
     SEPARADOR_ANCHO,
     FUENTE_EDITOR,
 )
@@ -21,6 +22,7 @@ from editor.sidebar import Sidebar
 from editor.search_bar import SearchBar
 from editor.script_selector import ScriptSelector
 from editor.fixed_search_bar import FixedSearchBar
+from editor.vbs_validator import validate_vbs, format_problemas
 
 class EditorApp(tk.Tk):
     """
@@ -130,6 +132,9 @@ class EditorApp(tk.Tk):
         # Conectar barra de búsqueda fija al editor de texto
         self.fixed_search.set_text_widget(self.text_editor)
 
+        # Botón guardar en la barra de búsqueda (a la derecha de las flechas)
+        self.fixed_search.add_save_button(self._guardar, self.status_var, self._update_status)
+
         # 7) Números de línea
         self.line_numbers = LineNumbers(editor_frame, self.text_editor)
         self.line_numbers.pack(side="left", fill="y")
@@ -181,8 +186,52 @@ class EditorApp(tk.Tk):
             f"{self._get_origen_label()} | Línea: {linea}  Col: {int(columna)+1} | {estado}"
         )
 
+    def _validar_script(self) -> bool:
+        """
+        Valida el script antes de guardar.
+        
+        Returns:
+            True si se puede continuar con el guardado, False si se cancela.
+        """
+        contenido = self.text_editor.get("1.0", "end-1c")
+        problemas = validate_vbs(contenido)
+        
+        if not problemas:
+            return True
+        
+        # Separar errores y avisos
+        errores = [p for p in problemas if p[0] == "error"]
+        avisos = [p for p in problemas if p[0] == "aviso"]
+        
+        resumen = format_problemas(problemas)
+        
+        if errores:
+            # Hay errores: preguntar si quiere guardar de todos modos
+            resp = messagebox.askyesno(
+                f"Validación — {len(errores)} error(es), {len(avisos)} aviso(s)",
+                f"Se han encontrado problemas en el script:\n\n"
+                f"{resumen}\n\n"
+                f"¿Desea guardar de todos modos?"
+            )
+            return resp
+        else:
+            # Solo avisos: informar y continuar
+            messagebox.showinfo(
+                f"Validación — {len(avisos)} aviso(s)",
+                f"Avisos en el script:\n\n"
+                f"{resumen}\n\n"
+                f"Se guardará igualmente."
+            )
+            return True
+
     def _guardar(self, event=None):
         """Guarda el script y campos editados en BD si hay conexión."""
+        # Validar script antes de guardar
+        if not self._validar_script():
+            self.status_var.set("Guardado cancelado — revisa los errores")
+            self.after(3000, self._update_status)
+            return "break"
+        
         if self.db and self.key_columns and self.record:
             # Obtener contenido del script
             contenido = self.text_editor.get("1.0", "end-1c")
@@ -211,14 +260,14 @@ class EditorApp(tk.Tk):
                     )
                 else:
                     self.text_editor.edit_modified(False)
-                    self.status_var.set("Guardado en SQL Server")
+                    self.status_var.set("✓ Guardado en SQL Server")
                     self.after(1500, self._update_status)
             except Exception as e:
                 messagebox.showerror("Error al guardar", str(e))
         else:
             # Sin conexión BD: guardado simulado
             self.text_editor.edit_modified(False)
-            self.status_var.set("Guardado (local)")
+            self.status_var.set("✓ Guardado (local)")
             self.after(1500, self._update_status)
 
         return "break"

@@ -90,7 +90,7 @@ class Sidebar(tk.Frame):
                     pass
             
             # El resto son metadata (excluir TIPO, se muestra aparte)
-            if field_upper != "TIPO":
+            if field_upper not in ("TIPO", "DESCRIPCION"):
                 self.metadata_fields.append((field_name, value))
     
     def _build_ui(self):
@@ -271,6 +271,12 @@ class Sidebar(tk.Frame):
                 except ValueError:
                     pass
         
+        # Guardar qué nombres de columna existen realmente en la BD
+        # para no intentar hacer UPDATE de columnas que no existen
+        self._db_variable_names = set()
+        for var_name, _ in self.variable_fields:
+            self._db_variable_names.add(var_name)
+        
         # Siempre crear 10 filas (Var 0 a Var 9)
         for i in range(10):
             if i in existing_vars:
@@ -365,9 +371,14 @@ class Sidebar(tk.Frame):
         """
         Obtiene los valores actuales de las 10 variables (Var 0 a Var 9).
         
+        Solo devuelve las que corresponden a columnas reales de la BD,
+        para evitar intentar UPDATE de columnas que no existen.
+        Incluye valores vacíos para que se guarde el borrado.
+        
         Returns:
-            Diccionario {nombre_columna: valor} para las variables con contenido
+            Diccionario {nombre_columna: valor} para las variables de BD
         """
+        db_names = getattr(self, '_db_variable_names', set())
         variables = {}
         for field_name, widget in self.field_widgets.items():
             upper = field_name.upper()
@@ -376,9 +387,9 @@ class Sidebar(tk.Frame):
                 (upper.startswith("TABLACAMPO") and len(upper) <= 11)
             )
             if is_var and isinstance(widget, tk.Entry):
-                value = widget.get().strip()
-                if value:  # Solo incluir variables con valor
-                    variables[field_name] = value
+                # Solo incluir si la columna existe realmente en la BD
+                if field_name in db_names:
+                    variables[field_name] = widget.get().strip()
         return variables
 
     def set_variable_values(self, values: list):

@@ -72,6 +72,9 @@ class FixedSearchBar(tk.Frame):
         )
         self.match_label.pack(side="left", padx=(6, 0))
 
+        # Placeholder para botón guardar (se añade desde app.py)
+        self._save_btn = None
+
     def _make_btn(self, text, command):
         """Crea un botón con estilo consistente."""
         btn = tk.Button(
@@ -89,6 +92,34 @@ class FixedSearchBar(tk.Frame):
         )
         btn.pack(side="left", padx=(0, 2))
         return btn
+
+    def add_save_button(self, save_command, status_var=None, update_status=None):
+        """Añade un botón de guardar (💾) a la derecha de la barra."""
+        # Separador visual
+        sep = tk.Frame(self, bg="#999999", width=1)
+        sep.pack(side="left", fill="y", padx=(10, 6), pady=2)
+
+        self._save_btn = tk.Button(
+            self,
+            text="💾 Guardar",
+            font=("Segoe UI", 10, "bold"),
+            bg="#1a73e8",
+            fg="#FFFFFF",
+            activebackground="#1558b0",
+            activeforeground="#FFFFFF",
+            relief="flat",
+            borderwidth=0,
+            cursor="hand2",
+            padx=10,
+            pady=3,
+            command=save_command,
+        )
+        self._save_btn.pack(side="left", padx=(0, 4))
+
+        # Tooltip vía barra de estado
+        if status_var and update_status:
+            self._save_btn.bind("<Enter>", lambda e: status_var.set("Guardar (Ctrl+S)"))
+            self._save_btn.bind("<Leave>", lambda e: update_status())
 
     def set_text_widget(self, text_widget: tk.Text):
         """Conecta el widget de texto al buscador (si no se pasó en el constructor)."""
