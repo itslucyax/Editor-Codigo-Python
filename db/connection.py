@@ -70,7 +70,7 @@ CONTEXT_PLANTILLA = "plantilla"
 # Tablas por defecto según contexto (configurables)
 DEFAULT_TABLES = {
     CONTEXT_DOCUMENTO: "G_SCRIPT",
-    CONTEXT_PLANTILLA: "G_SCRIPT_PLANTILLA",
+    CONTEXT_PLANTILLA: "E_PROGRA",
 }
 
 # Mapeo de flags de tipo en la cadena de conexión extendida
@@ -201,26 +201,42 @@ def parse_connection_string(conn_str: str) -> Dict[str, str]:
     # ------------------------------------------------------------------
     # Detectar formato extendido de Gestión 21
     # El valor de 'database' puede contener tokens extra separados por espacio:
-    #   "MiBaseDatos T01 BOBINADO D"  →  database=MiBaseDatos, modelo=T01, codigo=BOBINADO, tipo=D
-    #   "dato01ABEL A ETIQUETA P"     →  database=dato01ABEL,  modelo=A,   codigo=ETIQUETA,  tipo=P
-    # El último token es el flag de tipo (D=Documento, P=Plantilla).
-    # El penúltimo es el CODIGO.
-    # El antepenúltimo es el MODELO.
-    # Todo lo anterior es el nombre real de la BD.
+    #
+    # Formato DOCUMENTO (4 tokens):
+    #   "datosABEL T01 BOBINADO D"  →  database=datosABEL, modelo=T01, codigo=BOBINADO, tipo=documento
+    #   Tabla: G_SCRIPT, clave: MODELO+CODIGO
+    #
+    # Formato PLANTILLA (3 tokens):
+    #   "dato01ABEL A P"            →  database=dato01ABEL, modelo=A, tipo=plantilla
+    #   Tabla: E_PROGRA, clave: Plantilla (solo la letra)
+    #
+    # El último token es siempre el flag D=Documento, P=Plantilla.
     # ------------------------------------------------------------------
     db_raw = result.get("database", "")
     tokens = db_raw.split()
-    if len(tokens) >= 4:
+    if len(tokens) >= 3:
         flag = tokens[-1].upper()
         if flag in _TIPO_FLAG_MAP:
-            result["database"] = " ".join(tokens[:-3])  # nombre real de la BD
-            result["modelo"]   = tokens[-3]              # ej: "T01"
-            result["codigo"]   = tokens[-2]              # ej: "BOBINADO"
-            result["tipo"]     = _TIPO_FLAG_MAP[flag]    # "documento" o "plantilla"
-            logger.info(
-                "Formato extendido detectado: db=%s, modelo=%s, codigo=%s, tipo=%s",
-                result["database"], result["modelo"], result["codigo"], result["tipo"],
-            )
+            if flag == "P" and len(tokens) == 3:
+                # Plantilla: BD LETRA P  →  sin CODIGO
+                result["database"] = tokens[0]           # nombre real de la BD
+                result["modelo"]   = tokens[1]           # letra de plantilla (ej: "A")
+                result["codigo"]   = None                # plantillas no tienen CODIGO
+                result["tipo"]     = CONTEXT_PLANTILLA
+                logger.info(
+                    "Formato plantilla detectado: db=%s, plantilla=%s",
+                    result["database"], result["modelo"],
+                )
+            elif len(tokens) >= 4:
+                # Documento: BD MODELO CODIGO D
+                result["database"] = " ".join(tokens[:-3])  # nombre real de la BD
+                result["modelo"]   = tokens[-3]              # ej: "T01"
+                result["codigo"]   = tokens[-2]              # ej: "BOBINADO"
+                result["tipo"]     = CONTEXT_DOCUMENTO
+                logger.info(
+                    "Formato documento detectado: db=%s, modelo=%s, codigo=%s",
+                    result["database"], result["modelo"], result["codigo"],
+                )
 
     # Normalizar trust_server_certificate a booleano-string
     if "trust_server_certificate" in result:
