@@ -21,3 +21,53 @@ Traceback (most recent call last):
     return result
     ^^^^^^^^^^^^^
 SyntaxError: 'return' outside function
+
+
+
+
+
+
+Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (conexion-cadena-v2)
+$ grep -n "content_column\|E_PROGRA\|key_columns\|key_values\|has_empty" main.py
+197:    if args.content_column:
+198:        cli_args["content_column"] = args.content_column
+199:    if args.key_columns:
+200:        cli_args["key_columns"] = [c.strip() for c in args.key_columns.split(",")]
+201:    if args.key_values:
+202:        cli_args["key_values"] = [v.strip() for v in args.key_values.split(",")]
+223:        final_config.get("key_columns") and
+224:        final_config.get("key_values")
+257:            {"label": "BOBINADO", "content": TEXTO_EJEMPLO, "key_values": ["T01", "BOBINADO"]},
+258:            {"label": "FACTURA", "content": "' Script FACTURA\nSub Factura()\n    Dim total As Double\n    total = 100.50\n    MsgBox \"Total: \" & total\nEnd Sub", "key_values": ["T01", "FACTURA"]},
+259:            {"label": "ETIQUETA", "content": "' Script ETIQUETA\nSub Etiqueta()\n    Dim codigo As String\n    codigo = var0\n    MsgBox \"Codigo: \" & codigo\nEnd Sub", "key_values": ["T01", "ETIQUETA"]},
+266:            key_columns=ejemplo_keys,
+267:            content_column="SCRIPT",
+280:        # Si usamos connection string, key_columns/key_values pueden venir
+323:                content_column=final_config.get("content_column", "SCRIPT"),
+326:            # el tipo y el MODELO. Actualizar contexto y key_values.
+332:                if not final_config.get("key_columns"):
+333:                    final_config["key_columns"] = ["MODELO", "CODIGO"]
+334:                if not final_config.get("key_values"):
+335:                    final_config["key_values"] = [db.modelo, db.codigo or ""]
+351:                content_column=final_config.get("content_column", "SCRIPT"),
+369:        key_columns = final_config["key_columns"]
+370:        key_values = final_config["key_values"]
+374:        has_empty_key = any(v == "" for v in key_values)
+376:        if has_empty_key and len(key_columns) >= 2:
+377:            logger.info("CODIGO no especificado, cargando lista de scripts para MODELO=%s", key_values[0])
+378:            scripts_list = db.get_scripts_for_model(key_columns, key_values)
+382:                key_values = first["key_values"]
+383:                final_config["key_values"] = key_values
+385:                           ", ".join(f"{k}={v}" for k, v in zip(key_columns, key_values)))
+387:                logger.warning("No se encontraron scripts para MODELO=%s", key_values[0])
+390:                    ", ".join(f"{k}={v}" for k, v in zip(key_columns, key_values)))
+392:        record = db.get_record_full(key_columns, key_values)
+396:        content_column = final_config.get("content_column", "SCRIPT")
+397:        contenido = record.get(content_column, TEXTO_EJEMPLO)
+416:                key_columns=final_config["key_columns"],
+417:                key_values=final_config["key_values"],
+428:        key_columns=final_config["key_columns"],
+429:        content_column=final_config.get("content_column", "SCRIPT"),
+
+Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (conexion-cadena-v2)
+$
