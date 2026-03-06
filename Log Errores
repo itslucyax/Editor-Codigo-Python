@@ -234,3 +234,82 @@ $ sed -n '320, 400p' main.py
 
         logger.info("=== CARGA COMPLETADA EXITOSAMENTE ===")
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+2026-03-06 12:58:21  INFO      EditorVBS.config  Configuración final combinada
+2026-03-06 12:58:21  DEBUG     EditorVBS.config  Final config: {'connection_string': 'driver={SQL Server};server=GG\\SQL2019;uid=sa;pwd=sa;database=DATO01ABEL V P', 'content_column': 'SCRIPT', 'tipo': 'documento'}
+2026-03-06 12:58:21  INFO      EditorVBS.config  Usando connection string completa
+2026-03-06 12:58:21  INFO      EditorVBS  === INICIANDO CONEXIÓN A BASE DE DATOS ===
+2026-03-06 12:58:21  INFO      EditorVBS  Contexto de trabajo: DOCUMENTO
+2026-03-06 12:58:21  INFO      EditorVBS  Usando cadena de conexión proporcionada externamente
+2026-03-06 12:58:21  INFO      EditorVBS.db  Formato plantilla detectado: db=DATO01ABEL, plantilla=V
+2026-03-06 12:58:21  INFO      EditorVBS.db  Connection string parseada: server=GG\SQL2019, database=DATO01ABEL, user=sa
+2026-03-06 12:58:21  INFO      EditorVBS.db  Tabla resuelta por contexto 'plantilla': E_PROGRA
+2026-03-06 12:58:21  INFO      EditorVBS.db  DatabaseConnection creada desde connection string: server=GG\SQL2019, db=DATO01ABEL, tabla=E_PROGRA (contexto=plantilla, modelo=V)
+2026-03-06 12:58:21  INFO      EditorVBS  MODELO auto-detectado de la cadena: V
+2026-03-06 12:58:21  INFO      EditorVBS  CODIGO auto-detectado de la cadena: N/A
+2026-03-06 12:58:21  INFO      EditorVBS  Servidor: GG\SQL2019
+2026-03-06 12:58:21  INFO      EditorVBS  Base de datos: DATO01ABEL
+2026-03-06 12:58:21  INFO      EditorVBS  Tabla (resuelta): E_PROGRA
+2026-03-06 12:58:21  INFO      EditorVBS  Contexto: plantilla
+2026-03-06 12:58:21  DEBUG     EditorVBS.db  Cadena de conexión: DRIVER={SQL Server};SERVER=GG\SQL2019;DATABASE=DATO01ABEL;UID=****;PWD=****;TrustServerCertificate=yes;
+2026-03-06 12:58:21  INFO      EditorVBS.db  Conexión abierta a GG\SQL2019/DATO01ABEL
+2026-03-06 12:58:21  INFO      EditorVBS  ✓ Conexión establecida correctamente
+2026-03-06 12:58:21  DEBUG     EditorVBS.db  Esquema de tabla E_PROGRA: 2 columnas
+2026-03-06 12:58:21  INFO      EditorVBS  ✓ Esquema detectado: 2 columnas
+2026-03-06 12:58:21  DEBUG     EditorVBS  Columnas: ['PLANTILLA', 'TEXTO']
+2026-03-06 12:58:21  INFO      EditorVBS  Cargando registro: Plantilla=V
+2026-03-06 12:58:21  DEBUG     EditorVBS.db  Esquema de tabla E_PROGRA: 2 columnas
+2026-03-06 12:58:21  INFO      EditorVBS.db  Registro cargado: 2 columnas
+2026-03-06 12:58:21  DEBUG     EditorVBS.db  Columnas: ['PLANTILLA', 'TEXTO']
+2026-03-06 12:58:21  INFO      EditorVBS  ✓ Registro cargado: 2 campos
+2026-03-06 12:58:21  INFO      EditorVBS  ✓ Script cargado: 411 caracteres
+2026-03-06 12:58:21  INFO      EditorVBS  === CARGA COMPLETADA EXITOSAMENTE ===
+2026-03-06 12:58:21  INFO      EditorVBS.db  get_scripts_for_model: clave simple, no hay lista de scripts
+2026-03-06 12:58:21  INFO      EditorVBS  Scripts disponibles en desplegable: 0
+2026-03-06 12:58:26  INFO      EditorVBS  Conexión cerrada
