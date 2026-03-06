@@ -1,0 +1,10 @@
+C:\Users\Lucia\Desktop\Editor-Codigo-Python>python3 main.py --connection-string "driver={SQL Server};server=GG\SQL2019;uid=sa;pwd=sa;database=datosABEL T01 D"
+WARNING: No se encontraron scripts para MODELO=T01
+ERROR: Error fatal durante la carga
+Traceback (most recent call last):
+  File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\main.py", line 392, in main
+    record = db.get_record_full(key_columns, key_values)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\db\connection.py", line 811, in get_record_full
+    raise LookupError(f"No existe registro con {keys_display} en tabla {self.table}")
+LookupError: No existe registro con MODELO='T01', CODIGO='' en tabla G_SCRIPT
