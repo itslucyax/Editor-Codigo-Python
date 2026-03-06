@@ -104,3 +104,25 @@ python3 main.py --connection-string "driver={SQL Server};server=GG\SQL2019;uid=s
 
 PLANTILLA:
 python3 main.py --connection-string "driver={SQL Server};server=GG\SQL2019;uid=sa;pwd=sa;database=dato01ABEL A P"
+
+REUSLTADO PLANTILLA:
+$ python3 main.py --connection-string "driver={SQL Server};server=GG\SQL2019;uid=sa;pwd=sa;database=dato01ABEL A P"
+WARNING: Error al obtener lista de scripts: ('42S22', "[42S22] [Microsoft][ODBC SQL Server Driver][SQL Server]El nombre de columna 'MO
+DELO' no es válido. (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC SQL Server Driver][SQL Server]El nombre de columna 'MODELO' no es
+ válido. (207); [42S22] [Microsoft][ODBC SQL Server Driver][SQL Server]El nombre de columna 'CODIGO' no es válido. (207); [42S22] [Mic
+rosoft][ODBC SQL Server Driver][SQL Server]El nombre de columna 'SCRIPT' no es válido. (207); [42S22] [Microsoft][ODBC SQL Server Driv
+er][SQL Server]No se puede preparar la instrucción o instrucciones. (8180)")
+WARNING: No se encontraron scripts para MODELO=A
+ERROR: Error fatal durante la carga
+Traceback (most recent call last):
+  File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\main.py", line 392, in main
+    record = db.get_record_full(key_columns, key_values)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\db\connection.py", line 830, in get_record_full
+    row = cur.execute(sql, *key_values).fetchone()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pyodbc.ProgrammingError: ('42S22', "[42S22] [Microsoft][ODBC SQL Server Driver][SQL Server]El nombre de columna 'MODELO' no es válido.
+ (207) (SQLExecDirectW); [42S22] [Microsoft][ODBC SQL Server Driver][SQL Server]El nombre de columna 'CODIGO' no es válido. (207); [42
+S22] [Microsoft][ODBC SQL Server Driver][SQL Server]No se puede preparar la instrucción o instrucciones. (8180)")
+
+
