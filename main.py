@@ -30,6 +30,26 @@ import sys
 import tkinter as tk
 from tkinter import messagebox
 
+# -----------------------------------------------------------------------
+# Compatibilidad con Gestión 21 y otros ERPs que llaman al .exe pasando
+# la cadena de conexión como PRIMER ARGUMENTO POSICIONAL (sin flag):
+#
+#   EditorScript.exe "driver={SQL Server};server=GG\SQL2019;uid=sa;pwd=sa;database=dato01ABEL A P"
+#
+# argparse no reconoce argumentos posicionales sin flag → los ignora.
+# Detectamos este caso aquí y lo reinyectamos como --connection-string
+# para que el resto del código lo procese normalmente.
+# -----------------------------------------------------------------------
+def _normalizar_argv():
+    """Si el primer argumento no empieza por '-', es una connection string posicional."""
+    if len(sys.argv) >= 2 and not sys.argv[1].startswith("-"):
+        candidato = sys.argv[1]
+        # Heurística mínima: debe contener '=' para ser una connection string válida
+        if "=" in candidato:
+            sys.argv = [sys.argv[0], "--connection-string", candidato] + sys.argv[2:]
+
+_normalizar_argv()
+
 from editor.logger import logger
 from db.connection import (
     DatabaseConnection,
