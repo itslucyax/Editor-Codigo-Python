@@ -329,10 +329,22 @@ O simplemente:
             if db.modelo:
                 logger.info("MODELO auto-detectado de la cadena: %s", db.modelo)
                 logger.info("CODIGO auto-detectado de la cadena: %s", db.codigo or "N/A")
-                if not final_config.get("key_columns"):
-                    final_config["key_columns"] = ["MODELO", "CODIGO"]
-                if not final_config.get("key_values"):
-                    final_config["key_values"] = [db.modelo, db.codigo or ""]
+                if db.context_type == "plantilla":
+                    # E_PROGRA: clave es columna 'Plantilla', contenido en 'Texto'
+                    if not final_config.get("key_columns"):
+                        final_config["key_columns"] = ["Plantilla"]
+                    if not final_config.get("key_values"):
+                        final_config["key_values"] = [db.modelo]
+                    if not final_config.get("content_column"):
+                        final_config["content_column"] = "Texto"
+                else:
+                    # G_SCRIPT: clave es MODELO+CODIGO, contenido en SCRIPT
+                    if not final_config.get("key_columns"):
+                        final_config["key_columns"] = ["MODELO", "CODIGO"]
+                    if not final_config.get("key_values"):
+                        final_config["key_values"] = [db.modelo, db.codigo or ""]
+                    if not final_config.get("content_column"):
+                        final_config["content_column"] = "SCRIPT"
         else:
             # ---- Modo parámetros individuales (compatibilidad) ----
             resolved_table = resolve_table_for_context(
