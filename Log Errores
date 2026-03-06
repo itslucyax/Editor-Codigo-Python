@@ -69,5 +69,26 @@ $ grep -n "content_column\|E_PROGRA\|key_columns\|key_values\|has_empty" main.py
 428:        key_columns=final_config["key_columns"],
 429:        content_column=final_config.get("content_column", "SCRIPT"),
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (conexion-cadena-v2)
+$ python3 "import ast; ast.parse(open('db/connection.py').read()); print('Sintaxis OK')"
+C:\Users\Lucia\AppData\Local\Programs\Python\Python312\python.exe: can't open file "C:\\Users\\Lucia\\Desktop\\Editor-Codigo-Python\\i
+mport ast; ast.parse(open('db\\connection.py').read()); print('Sintaxis OK')": [Errno 2] No such file or directory
+
+
+
+
 Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (conexion-cadena-v2)
 $
