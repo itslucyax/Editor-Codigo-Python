@@ -297,6 +297,7 @@ class DatabaseConnection:
         content_column: str = "SCRIPT",
         context_type: Optional[str] = None,
         modelo: Optional[str] = None,
+        codigo: Optional[str] = None,
     ):
         self.server = server
         self.database = database
@@ -308,6 +309,7 @@ class DatabaseConnection:
         self.content_column = content_column
         self.context_type = context_type  # 'documento' | 'plantilla' | None
         self.modelo = modelo              # MODELO extraído de la cadena (o None)
+        self.codigo = codigo              # CODIGO extraído de la cadena (o None)
 
         self._cnxn: Optional[pyodbc.Connection] = None
 
@@ -368,6 +370,7 @@ class DatabaseConnection:
         # Si el parser detectó formato extendido, usar tipo/modelo de la cadena
         effective_context = params.pop("tipo", None) or context_type
         modelo = params.pop("modelo", None)
+        codigo = params.pop("codigo", None)
 
         # Resolución de la tabla por contexto
         resolved_table = resolve_table_for_context(
@@ -411,6 +414,7 @@ class DatabaseConnection:
             content_column=content_column,
             context_type=effective_context,
             modelo=modelo,
+            codigo=codigo,
         )
 
     # ------------------------------------------------------------------
