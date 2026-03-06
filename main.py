@@ -41,14 +41,64 @@ from tkinter import messagebox
 # para que el resto del código lo procese normalmente.
 # -----------------------------------------------------------------------
 def _normalizar_argv():
-    """Si el primer argumento no empieza por '-', es una connection string posicional."""
-    if len(sys.argv) >= 2 and not sys.argv[1].startswith("-"):
-        candidato = sys.argv[1]
-        # Heurística mínima: debe contener '=' para ser una connection string válida
-        if "=" in candidato:
-            sys.argv = [sys.argv[0], "--connection-string", candidato] + sys.argv[2:]
+    """
+    Detecta y normaliza la cadena de conexión cuando se pasa como argumento
+    posicional (sin flag), que es como la envían la mayoría de ERPs:
+
+        EditorScript.exe "driver={SQL Server};server=GG\\SQL2019;uid=sa;pwd=sa;database=dato01ABEL A P"
+
+    Casos que maneja:
+    1. Un único argumento posicional con la cadena completa entre comillas.
+    2. La cadena llega fragmentada en varios args (sin comillas en la llamada):
+           EditorScript.exe driver={SQL Server};server=GG\\SQL2019;uid=sa;pwd=sa;database=dato01ABEL A P
+       → los tokens se unen en una sola cadena.
+    """
+    if len(sys.argv) < 2:
+        return
+
+    # Si ya viene con flag reconocido, no hacer nada
+    if sys.argv[1].startswith("-"):
+        return
+
+    # Reunir todos los args posicionales hasta el primero que empiece por '-'
+    partes = []
+    resto = []
+    i = 1
+    while i < len(sys.argv):
+        if sys.argv[i].startswith("-"):
+            resto = sys.argv[i:]
+            break
+        partes.append(sys.argv[i])
+        i += 1
+
+    candidato = " ".join(partes)
+
+    # Heurística: debe tener '=' y ';' para ser una connection string válida
+    if "=" in candidato and ";" in candidato:
+        sys.argv = [sys.argv[0], "--connection-string", candidato] + resto
 
 _normalizar_argv()
+
+# Logging de diagnóstico: registrar argv y variables de entorno relevantes
+# ANTES de importar nada más para capturar el estado más temprano posible.
+import logging as _logging
+_early_log = _logging.getLogger("EditorVBS.startup")
+try:
+    import os as _os
+    _appdata = _os.environ.get("APPDATA", _os.path.expanduser("~"))
+    _log_dir = _os.path.join(_appdata, "EditorVBS")
+    _os.makedirs(_log_dir, exist_ok=True)
+    _startup_handler = _logging.FileHandler(
+        _os.path.join(_log_dir, "startup.log"), encoding="utf-8"
+    )
+    _startup_handler.setFormatter(_logging.Formatter("%(asctime)s %(message)s"))
+    _early_log.addHandler(_startup_handler)
+    _early_log.setLevel(_logging.DEBUG)
+    _early_log.info("=== STARTUP ===")
+    _early_log.info("sys.argv: %s", sys.argv)
+    _early_log.info("EDITOR_CONNECTION_STRING env: %s", _os.environ.get("EDITOR_CONNECTION_STRING", "(no definida)"))
+except Exception:
+    pass
 
 from editor.logger import logger
 from db.connection import (
@@ -243,6 +293,14 @@ O simplemente:
         final_config.get("key_columns") and 
         final_config.get("key_values")
     )
+
+    # Diagnóstico: loggear la decisión con todos los datos
+    logger.info("=== DECISIÓN MODO ===")
+    logger.info("sys.argv al entrar en main(): %s", sys.argv)
+    logger.info("has_connection_string=%s | has_minimal_config=%s | args.local=%s",
+                has_connection_string, has_minimal_config, args.local)
+    logger.info("final_config (sin pwd): %s",
+                {k: v if k != "password" else "***" for k, v in final_config.items()})
     
     if args.local or not has_minimal_config:
         if not has_minimal_config and not args.local:
@@ -351,12 +409,18 @@ O simplemente:
                 logger.info("CODIGO auto-detectado de la cadena: %s", db.codigo or "N/A")
                 if db.context_type == "plantilla":
                     # E_PROGRA: clave es columna 'Plantilla', contenido en 'Texto'
+                    # SIEMPRE sobreescribir: estos valores vienen de la cadena,
+                    # tienen prioridad sobre cualquier default del argparser.
                     if not final_config.get("key_columns"):
                         final_config["key_columns"] = ["Plantilla"]
                     if not final_config.get("key_values"):
                         final_config["key_values"] = [db.modelo]
-                    if not final_config.get("content_column"):
+                    # content_column: forzar a "Texto" salvo que el usuario
+                    # lo haya especificado explícitamente por CLI/env/JSON
+                    # (el default del argparser es "SCRIPT", no cuenta)
+                    if final_config.get("content_column", "SCRIPT") == "SCRIPT":
                         final_config["content_column"] = "Texto"
+                        logger.info("content_column forzado a 'Texto' para contexto plantilla")
                 else:
                     # G_SCRIPT: clave es MODELO+CODIGO, contenido en SCRIPT
                     if not final_config.get("key_columns"):
