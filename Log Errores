@@ -92,3 +92,15 @@ mport ast; ast.parse(open('db\\connection.py').read()); print('Sintaxis OK')": [
 
 Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (conexion-cadena-v2)
 $
+
+
+
+
+
+
+
+DOCUMENTO:
+python3 main.py --connection-string "driver={SQL Server};server=GG\SQL2019;uid=sa;pwd=sa;database=datosABEL T01 BOBINADO D"
+
+PLANTILLA:
+python3 main.py --connection-string "driver={SQL Server};server=GG\SQL2019;uid=sa;pwd=sa;database=dato01ABEL A P"
