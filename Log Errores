@@ -126,3 +126,111 @@ pyodbc.ProgrammingError: ('42S22', "[42S22] [Microsoft][ODBC SQL Server Driver][
 S22] [Microsoft][ODBC SQL Server Driver][SQL Server]No se puede preparar la instrucción o instrucciones. (8180)")
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (conexion-cadena-v2)
+$ sed -n '320, 400p' main.py
+                context_type=context_type,
+                table=final_config.get("table"),        # override manual si existe
+                table_map=custom_table_map,
+                content_column=final_config.get("content_column", "SCRIPT"),
+            )
+            # Si la cadena tiene formato extendido (Gestión 21) se auto-detecta
+            # el tipo y el MODELO. Actualizar contexto y key_values.
+            if db.context_type:
+                context_type = db.context_type
+            if db.modelo:
+                logger.info("MODELO auto-detectado de la cadena: %s", db.modelo)
+                logger.info("CODIGO auto-detectado de la cadena: %s", db.codigo or "N/A")
+                if not final_config.get("key_columns"):
+                    final_config["key_columns"] = ["MODELO", "CODIGO"]
+                if not final_config.get("key_values"):
+                    final_config["key_values"] = [db.modelo, db.codigo or ""]
+        else:
+            # ---- Modo parámetros individuales (compatibilidad) ----
+            resolved_table = resolve_table_for_context(
+                context_type,
+                table_override=final_config.get("table"),
+                table_map=custom_table_map,
+            )
+            db = DatabaseConnection(
+                server=final_config["server"],
+                database=final_config["database"],
+                table=resolved_table,
+                user=final_config["user"],
+                password=final_config["password"],
+                driver=final_config.get("driver", "ODBC Driver 18 for SQL Server"),
+                trust_server_certificate=final_config.get("trust_cert", True),
+                content_column=final_config.get("content_column", "SCRIPT"),
+                context_type=context_type,
+            )
+
+        logger.info("Servidor: %s", db.server)
+        logger.info("Base de datos: %s", db.database)
+        logger.info("Tabla (resuelta): %s", db.table)
+        logger.info("Contexto: %s", db.context_type)
+
+        db.connect()
+        logger.info("✓ Conexión establecida correctamente")
+
+        # Obtener esquema de la tabla
+        schema = db.get_table_schema()
+        logger.info("✓ Esquema detectado: %d columnas", len(schema))
+        logger.debug("Columnas: %s", [col["name"] for col in schema])
+
+        # Cargar registro completo con TODOS los campos
+        key_columns = final_config["key_columns"]
+        key_values = final_config["key_values"]
+
+        # Si solo tenemos MODELO (sin CODIGO), cargar la lista de scripts
+        # y usar el primero como registro por defecto.
+        has_empty_key = any(v == "" for v in key_values)
+
+        if has_empty_key and len(key_columns) >= 2:
+            logger.info("CODIGO no especificado, cargando lista de scripts para MODELO=%s", key_values[0])
+            scripts_list = db.get_scripts_for_model(key_columns, key_values)
+            if scripts_list:
+                # Usar el primer script disponible como registro inicial
+                first = scripts_list[0]
+                key_values = first["key_values"]
+                final_config["key_values"] = key_values
+                logger.info("Registro inicial auto-seleccionado: %s",
+                           ", ".join(f"{k}={v}" for k, v in zip(key_columns, key_values)))
+            else:
+                logger.warning("No se encontraron scripts para MODELO=%s", key_values[0])
+
+        logger.info("Cargando registro: %s",
+                    ", ".join(f"{k}={v}" for k, v in zip(key_columns, key_values)))
+
+        record = db.get_record_full(key_columns, key_values)
+        logger.info("✓ Registro cargado: %d campos", len(record))
+
+        # Extraer contenido del script
+        content_column = final_config.get("content_column", "SCRIPT")
+        contenido = record.get(content_column, TEXTO_EJEMPLO)
+        logger.info("✓ Script cargado: %d caracteres", len(contenido))
+
+        logger.info("=== CARGA COMPLETADA EXITOSAMENTE ===")
+
