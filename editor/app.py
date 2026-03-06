@@ -92,11 +92,14 @@ class EditorApp(tk.Tk):
             content_column=self.content_column,
             editable_columns=self.editable_columns
         )
-        self.sidebar.pack(side="left", fill="y")
+        if self.context_type != "plantilla":
+            self.sidebar.pack(side="left", fill="y")
 
         # 2) Separador visual entre sidebar y números de línea
         self.separator = tk.Frame(self.main_frame, width=SEPARADOR_ANCHO, bg=COLOR_SEPARADOR)
-        self.separator.pack(side="left", fill="y", padx=5)
+        #Ocultar separador si es plantilla (no hay sidebar)
+        if self.context_type == "plantilla":
+            self.separator.pack(side="left", fill="y", padx=5)
 
         # 3) Frame derecho (barras superiores + área de edición)
         right_frame = tk.Frame(self.main_frame, bg=COLOR_FONDO)
