@@ -198,27 +198,30 @@ def parse_connection_string(conn_str: str) -> Dict[str, str]:
             f"Formato esperado: 'Server=srv;Database=db;UID=user;PWD=pass;'"
         )
 
-    # ------------------------------------------------------------------
-    # Detectar formato extendido de Gestión 21
-    # El valor de 'database' puede contener tokens extra separados por espacio:
-    #   "MiBaseDatos T01 D"    →  database=MiBaseDatos, modelo=T01, tipo=D
-    #   "MiBaseDatos_PLT A P"  →  database=MiBaseDatos_PLT, modelo=A,   tipo=P
-    # El último token es el flag de tipo (D=Documento, P=Plantilla).
-    # El penúltimo es el MODELO.
-    # ------------------------------------------------------------------
-    db_raw = result.get("database", "")
-    tokens = db_raw.split()
-    if len(tokens) >= 3:
-        flag = tokens[-1].upper()
-        if flag in _TIPO_FLAG_MAP:
-            result["database"] = " ".join(tokens[:-2])  # nombre real de la BD
-            result["modelo"] = tokens[-2]                 # ej: "T01", "A"
-            result["tipo"] = _TIPO_FLAG_MAP[flag]         # "documento" o "plantilla"
-            logger.info(
-                "Formato extendido detectado: db=%s, modelo=%s, tipo=%s",
-                result["database"], result["modelo"], result["tipo"],
-            )
-
+# ------------------------------------------------------------------
+# Detectar formato extendido de Gestión 21
+# El valor de 'database' puede contener tokens extra separados por espacio:
+#   "MiBaseDatos T01 BOBINADO D"  →  database=MiBaseDatos, modelo=T01, codigo=BOBINADO, tipo=D
+#   "MiBaseDatos A FACTURA P"     →  database=MiBaseDatos, modelo=A,   codigo=FACTURA,  tipo=P
+# El último token es el flag de tipo (D=Documento, P=Plantilla).
+# El penúltimo es el CODIGO.
+# El antepenúltimo es el MODELO.
+# Todo lo anterior es el nombre real de la BD.
+# ------------------------------------------------------------------
+db_raw = result.get("database", "")
+tokens = db_raw.split()
+if len(tokens) >= 4:
+    flag = tokens[-1].upper()
+    if flag in _TIPO_FLAG_MAP:
+        result["database"] = " ".join(tokens[:-3])  # nombre real de la BD
+        result["modelo"]   = tokens[-3]              # ej: "T01"
+        result["codigo"]   = tokens[-2]              # ej: "BOBINADO"
+        result["tipo"]     = _TIPO_FLAG_MAP[flag]    # "documento" o "plantilla"
+        logger.info(
+            "Formato extendido detectado: db=%s, modelo=%s, codigo=%s, tipo=%s",
+            result["database"], result["modelo"], result["codigo"], result["tipo"],
+        )
+        
     # Normalizar trust_server_certificate a booleano-string
     if "trust_server_certificate" in result:
         val = result["trust_server_certificate"].lower()
@@ -294,6 +297,7 @@ class DatabaseConnection:
         content_column: str = "SCRIPT",
         context_type: Optional[str] = None,
         modelo: Optional[str] = None,
+        codigo: Optional[str] = None,
     ):
         self.server = server
         self.database = database
@@ -305,6 +309,7 @@ class DatabaseConnection:
         self.content_column = content_column
         self.context_type = context_type  # 'documento' | 'plantilla' | None
         self.modelo = modelo              # MODELO extraído de la cadena (o None)
+        self.codigo = codigo              # CODIGO extraído de la cadena (o None)
 
         self._cnxn: Optional[pyodbc.Connection] = None
 
@@ -365,6 +370,7 @@ class DatabaseConnection:
         # Si el parser detectó formato extendido, usar tipo/modelo de la cadena
         effective_context = params.pop("tipo", None) or context_type
         modelo = params.pop("modelo", None)
+        codigo = params.pop("codigo", None)
 
         # Resolución de la tabla por contexto
         resolved_table = resolve_table_for_context(
@@ -408,6 +414,7 @@ class DatabaseConnection:
             content_column=content_column,
             context_type=effective_context,
             modelo=modelo,
+            codigo=codigo,
         )
 
     # ------------------------------------------------------------------

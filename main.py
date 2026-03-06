@@ -328,11 +328,11 @@ O simplemente:
                 context_type = db.context_type
             if db.modelo:
                 logger.info("MODELO auto-detectado de la cadena: %s", db.modelo)
-                # Si no se dieron key_columns/key_values explícitos, auto-configurar
+                logger.info("CODIGO auto-detectado de la cadena: %s", db.codigo or "N/A")
                 if not final_config.get("key_columns"):
                     final_config["key_columns"] = ["MODELO", "CODIGO"]
                 if not final_config.get("key_values"):
-                    final_config["key_values"] = [db.modelo, ""]
+                    final_config["key_values"] = [db.modelo, db.codigo or ""]
         else:
             # ---- Modo parámetros individuales (compatibilidad) ----
             resolved_table = resolve_table_for_context(
