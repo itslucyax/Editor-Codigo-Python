@@ -92,13 +92,14 @@ class EditorApp(tk.Tk):
             content_column=self.content_column,
             editable_columns=self.editable_columns
         )
+        # Ocultar sidebar en plantillas
         if self.context_type != "plantilla":
             self.sidebar.pack(side="left", fill="y")
 
         # 2) Separador visual entre sidebar y números de línea
         self.separator = tk.Frame(self.main_frame, width=SEPARADOR_ANCHO, bg=COLOR_SEPARADOR)
-        #Ocultar separador si es plantilla (no hay sidebar)
-        if self.context_type == "plantilla":
+        # Ocultar separador en plantillas
+        if self.context_type != "plantilla":
             self.separator.pack(side="left", fill="y", padx=5)
 
         # 3) Frame derecho (barras superiores + área de edición)
@@ -113,7 +114,8 @@ class EditorApp(tk.Tk):
         self.script_selector = ScriptSelector(
             right_frame,
             scripts_list=self.scripts_list,
-            on_select_callback=self._on_script_selected
+            on_select_callback=self._on_script_selected,
+            context_type=self.context_type
         )
         self.script_selector.pack(side="top", fill="x")
 
@@ -211,8 +213,8 @@ class EditorApp(tk.Tk):
         if errores:
             # Hay errores: preguntar si quiere guardar de todos modos
             resp = messagebox.askyesno(
-                f"Validación — {len(errores)} error(es), {len(avisos)} aviso(s)",
-                f"Se han encontrado problemas en el script:\n\n"
+                f"Validación del script — {len(errores)} error(es), {len(avisos)} aviso(s)",
+                f"Se han detectado los siguientes problemas en el script:\n\n"
                 f"{resumen}\n\n"
                 f"¿Desea guardar de todos modos?"
             )
@@ -220,10 +222,10 @@ class EditorApp(tk.Tk):
         else:
             # Solo avisos: informar y continuar
             messagebox.showinfo(
-                f"Validación — {len(avisos)} aviso(s)",
-                f"Avisos en el script:\n\n"
+                f"Validación del script — {len(avisos)} aviso(s)",
+                f"Se han detectado los siguientes avisos en el script:\n\n"
                 f"{resumen}\n\n"
-                f"Se guardará igualmente."
+                f"El registro se guardará igualmente."
             )
             return True
 
@@ -231,7 +233,7 @@ class EditorApp(tk.Tk):
         """Guarda el script y campos editados en BD si hay conexión."""
         # Validar script antes de guardar
         if not self._validar_script():
-            self.status_var.set("Guardado cancelado — revisa los errores")
+            self.status_var.set("Guardado cancelado. El script contiene errores.")
             self.after(3000, self._update_status)
             return "break"
         
@@ -257,16 +259,20 @@ class EditorApp(tk.Tk):
                 if not ok:
                     key_display = ", ".join(f"{k}={v}" for k, v in zip(self.key_columns, key_values))
                     messagebox.showwarning(
-                        "Guardar", 
-                        f"No se actualizó ninguna fila.\n"
-                        f"Revisa que exista el registro con {key_display}"
+                        "Guardar registro",
+                        f"No se ha actualizado ningún registro.\n"
+                        f"Compruebe que exista el registro con {key_display}."
                     )
                 else:
                     self.text_editor.edit_modified(False)
-                    self.status_var.set("✓ Guardado en SQL Server")
+                    self.status_var.set("✓ Los cambios han sido guardados")
                     self.after(1500, self._update_status)
+                    messagebox.showinfo(
+                        "Registro guardado",
+                        "✓ Los cambios han sido guardados correctamente."
+                    )
             except Exception as e:
-                messagebox.showerror("Error al guardar", str(e))
+                messagebox.showerror("Error al guardar el registro", str(e))
         else:
             # Sin conexión BD: guardado simulado
             self.text_editor.edit_modified(False)
@@ -284,7 +290,7 @@ class EditorApp(tk.Tk):
         if self.text_editor.edit_modified():
             resp = messagebox.askyesnocancel(
                 "Cambios sin guardar",
-                "Hay cambios sin guardar.\n¿Guardar antes de cambiar de script?"
+                "Existen cambios sin guardar.\n¿Desea guardarlos antes de cambiar de script?"
             )
             if resp is None:
                 return
@@ -312,8 +318,9 @@ class EditorApp(tk.Tk):
                     content_column=self.content_column,
                     editable_columns=self.editable_columns
                 )
-                # Insertar antes del separador
-                self.sidebar.pack(side="left", fill="y", before=self.separator)
+                # Insertar antes del separador (solo si no es plantilla)
+                if self.context_type != "plantilla":
+                    self.sidebar.pack(side="left", fill="y", before=self.separator)
                 
                 # Actualizar título
                 ctx_label = ""
@@ -323,7 +330,7 @@ class EditorApp(tk.Tk):
                 self.title(f"Editor VBS{ctx_label} - {key_display}")
                 
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo cargar el script:\n{e}")
+                messagebox.showerror("Error al cargar el script", f"No se ha podido cargar el script:\n{e}")
                 return
         else:
             # Modo local o sin key_values: solo cambiar contenido
@@ -342,7 +349,7 @@ class EditorApp(tk.Tk):
         if self.text_editor.edit_modified():
             respuesta = messagebox.askyesnocancel(
                 "Cambios sin guardar",
-                "Hay cambios sin guardar.\n\n¿Desea guardar antes de cerrar?"
+                "Existen cambios sin guardar.\n\n¿Desea guardarlos antes de cerrar?"
             )
             if respuesta is None:
                 # Cancelar: no cerrar

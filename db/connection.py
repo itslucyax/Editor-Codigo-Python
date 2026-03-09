@@ -670,7 +670,79 @@ class DatabaseConnection:
         return scripts
 
     # ------------------------------------------------------------------
-    # Variables de entorno Var0-Var9
+    # Listado de plantillas (para el desplegable en modo plantilla)
+    # ------------------------------------------------------------------
+
+    def get_all_plantillas(
+        self,
+        tabla_listado: str = "E_PLANTI",
+        col_clave: str = "PLANTILLA",
+        col_descri: str = "DESCRI",
+        tabla_contenido: str = "E_PROGRA",
+        col_contenido: str = "TEXTO",
+    ) -> List[dict]:
+        """
+        Obtiene todas las plantillas disponibles para el desplegable.
+
+        Consulta E_PLANTI (listado) y une con E_PROGRA (contenido) para
+        devolver el label 'PLANTILLA - DESCRI' y el texto de cada plantilla.
+
+        Args:
+            tabla_listado:   Tabla con el catálogo de plantillas (E_PLANTI).
+            col_clave:       Columna clave en ambas tablas (PLANTILLA).
+            col_descri:      Columna descripción en la tabla listado (DESCRI).
+            tabla_contenido: Tabla con el texto de la plantilla (E_PROGRA).
+            col_contenido:   Columna con el texto (TEXTO).
+
+        Returns:
+            Lista de dicts:
+            [{"label": "A - Copia estándar", "key_values": ["A"], "content": "..."}]
+        """
+        cur = self._cursor()
+
+        safe_tl  = _sanitize_identifier(tabla_listado,   "tabla_listado")
+        safe_tc  = _sanitize_identifier(tabla_contenido, "tabla_contenido")
+        safe_ck  = _sanitize_identifier(col_clave,       "col_clave")
+        safe_cd  = _sanitize_identifier(col_descri,      "col_descri")
+        safe_cnt = _sanitize_identifier(col_contenido,   "col_contenido")
+
+        # LEFT JOIN para que aparezcan también plantillas sin contenido todavía
+        sql = f"""
+            SELECT
+                l.[{safe_ck}],
+                l.[{safe_cd}],
+                p.[{safe_cnt}]
+            FROM [{safe_tl}] l
+            LEFT JOIN [{safe_tc}] p
+                ON l.[{safe_ck}] = p.[{safe_ck}]
+            ORDER BY l.[{safe_ck}]
+        """
+        logger.debug("get_all_plantillas SQL: %s", sql.strip())
+
+        try:
+            rows = cur.execute(sql).fetchall()
+        except Exception as e:
+            logger.warning("Error al obtener lista de plantillas: %s", e)
+            return []
+
+        plantillas = []
+        for row in rows:
+            clave   = "" if row[0] is None else str(row[0]).strip()
+            descri  = "" if row[1] is None else str(row[1]).strip()
+            content = "" if row[2] is None else str(row[2]).strip()
+
+            label = f"{clave} - {descri}" if descri else clave
+
+            plantillas.append({
+                "label":      label,
+                "key_values": [clave],
+                "content":    content,
+            })
+
+        logger.info("get_all_plantillas: %d plantillas encontradas", len(plantillas))
+        return plantillas
+
+
     # ------------------------------------------------------------------
 
     def get_variables(self, modelo: str, codigo: str,

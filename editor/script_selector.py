@@ -27,10 +27,11 @@ class ScriptSelector(tk.Frame):
                            Recibe (index: int, script_data: dict).
     """
 
-    def __init__(self, master, scripts_list=None, on_select_callback=None):
+    def __init__(self, master, scripts_list=None, on_select_callback=None, context_type=None):
         super().__init__(master, bg=COLOR_BARRA_ESTADO_BG, padx=8, pady=4)
         self.scripts = self._normalize_scripts(scripts_list or [])
         self.on_select = on_select_callback
+        self.context_type = context_type  # 'documento' | 'plantilla' | None
         self._build_ui()
 
     @staticmethod
@@ -63,10 +64,11 @@ class ScriptSelector(tk.Frame):
 
     def _build_ui(self):
         """Construye la interfaz del selector."""
-        # Label
+        # Label dinámico según contexto
+        label_text = "Mostrar Plantilla:" if self.context_type == "plantilla" else "Mostrar SCRIPT:"
         tk.Label(
             self,
-            text="Mostrar SCRIPT:",
+            text=label_text,
             bg=COLOR_BARRA_ESTADO_BG,
             fg=COLOR_BARRA_ESTADO_FG,
             font=("Segoe UI", 9, "bold"),
@@ -101,9 +103,10 @@ class ScriptSelector(tk.Frame):
             self.combo.current(0)
 
         # Indicador de total
+        unit = "plantillas" if self.context_type == "plantilla" else "scripts"
         self.count_label = tk.Label(
             self,
-            text=f"{len(self.scripts)} scripts",
+            text=f"{len(self.scripts)} {unit}",
             bg=COLOR_BARRA_ESTADO_BG,
             fg="#888888",
             font=("Segoe UI", 8),

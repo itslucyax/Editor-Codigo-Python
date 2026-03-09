@@ -211,7 +211,7 @@ O simplemente:
                         help="Columnas clave separadas por coma (ej: MODELO,CODIGO)")
     parser.add_argument("--key-values",
                         help="Valores de las claves separados por coma (ej: T01,SCRIPT001)")
-    parser.add_argument("--content-column", default="SCRIPT",
+    parser.add_argument("--content-column", default=None,
                         help="Columna con el contenido del script")
 
     # Columnas editables (opcional - por defecto se detecta automáticamente)
@@ -409,18 +409,15 @@ O simplemente:
                 logger.info("CODIGO auto-detectado de la cadena: %s", db.codigo or "N/A")
                 if db.context_type == "plantilla":
                     # E_PROGRA: clave es columna 'Plantilla', contenido en 'Texto'
-                    # SIEMPRE sobreescribir: estos valores vienen de la cadena,
-                    # tienen prioridad sobre cualquier default del argparser.
                     if not final_config.get("key_columns"):
                         final_config["key_columns"] = ["Plantilla"]
                     if not final_config.get("key_values"):
                         final_config["key_values"] = [db.modelo]
-                    # content_column: forzar a "Texto" salvo que el usuario
-                    # lo haya especificado explícitamente por CLI/env/JSON
-                    # (el default del argparser es "SCRIPT", no cuenta)
-                    if final_config.get("content_column", "SCRIPT") == "SCRIPT":
+                    # Forzar content_column a "Texto" salvo que el usuario
+                    # lo haya pasado explícitamente por CLI/env/JSON
+                    if not final_config.get("content_column"):
                         final_config["content_column"] = "Texto"
-                        logger.info("content_column forzado a 'Texto' para contexto plantilla")
+                        logger.info("content_column establecido a 'Texto' para contexto plantilla")
                 else:
                     # G_SCRIPT: clave es MODELO+CODIGO, contenido en SCRIPT
                     if not final_config.get("key_columns"):
@@ -514,18 +511,24 @@ O simplemente:
     # ========================================================================
     # LANZAR EDITOR CON DATOS DINÁMICOS
     # ========================================================================
-    # Cargar lista de scripts dinámicamente desde BD (para el desplegable)
+    # Cargar lista para el desplegable según el contexto
     scripts_list = final_config.get("scripts_list", [])
-    
+
     if not scripts_list and db:
         try:
-            scripts_list = db.get_scripts_for_model(
-                key_columns=final_config["key_columns"],
-                key_values=final_config["key_values"],
-            )
-            logger.info("Scripts disponibles en desplegable: %d", len(scripts_list))
+            if context_type == CONTEXT_PLANTILLA:
+                # Plantilla: cargar todas desde E_PLANTI con label "PLANTILLA - DESCRI"
+                scripts_list = db.get_all_plantillas()
+                logger.info("Plantillas disponibles en desplegable: %d", len(scripts_list))
+            else:
+                # Documento: cargar los scripts del mismo MODELO
+                scripts_list = db.get_scripts_for_model(
+                    key_columns=final_config["key_columns"],
+                    key_values=final_config["key_values"],
+                )
+                logger.info("Scripts disponibles en desplegable: %d", len(scripts_list))
         except Exception as e:
-            logger.warning("No se pudo cargar lista de scripts: %s", e)
+            logger.warning("No se pudo cargar lista para el desplegable: %s", e)
             scripts_list = []
     
     app = EditorApp(
