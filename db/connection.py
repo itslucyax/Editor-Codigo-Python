@@ -706,16 +706,20 @@ class DatabaseConnection:
         safe_cd  = _sanitize_identifier(col_descri,      "col_descri")
         safe_cnt = _sanitize_identifier(col_contenido,   "col_contenido")
 
-        # LEFT JOIN para que aparezcan también plantillas sin contenido todavía
         sql = f"""
-            SELECT
-                l.[{safe_ck}],
-                l.[{safe_cd}],
-                p.[{safe_cnt}]
-            FROM [{safe_tl}] l
-            LEFT JOIN [{safe_tc}] p
-                ON l.[{safe_ck}] = p.[{safe_ck}]
-            ORDER BY l.[{safe_ck}]
+            SELECT s.[{safe_ck}], s.[{safe_cd}], p2.[{safe_cnt}]
+            FROM (
+                SELECT
+                    p.[{safe_ck}]  AS [{safe_ck}],
+                    l.[{safe_cd}]  AS [{safe_cd}]
+                FROM [{safe_tc}] p
+                LEFT JOIN [{safe_tl}] l
+                    ON p.[{safe_ck}] = l.[{safe_ck}]
+                GROUP BY p.[{safe_ck}], l.[{safe_cd}]
+            ) AS s
+            LEFT JOIN [{safe_tc}] p2
+                ON s.[{safe_ck}] = p2.[{safe_ck}]
+            ORDER BY s.[{safe_ck}]
         """
         logger.debug("get_all_plantillas SQL: %s", sql.strip())
 
