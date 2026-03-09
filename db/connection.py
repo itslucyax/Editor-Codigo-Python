@@ -708,7 +708,7 @@ class DatabaseConnection:
 
         # LEFT JOIN para que aparezcan también plantillas sin contenido todavía
         sql = f"""
-            SELECT
+            SELECT DISTINCT
                 l.[{safe_ck}],
                 l.[{safe_cd}],
                 p.[{safe_cnt}]
@@ -716,6 +716,17 @@ class DatabaseConnection:
             LEFT JOIN [{safe_tc}] p
                 ON l.[{safe_ck}] = p.[{safe_ck}]
             ORDER BY l.[{safe_ck}]
+        """
+        """
+        sql = f
+            SELECT
+                p.[{safe_ck}],
+                l.[{safe_cd}],
+                max(p.[{safe_cnt}])
+            FROM [{safe_tc}] AS p
+            LEFT JOIN [{safe_tl}] AS l
+                ON p.[{safe_ck}] = l.[{safe_ck}]
+            GROUP BY p.[{safe_ck}], l.[{safe_cd}]
         """
         logger.debug("get_all_plantillas SQL: %s", sql.strip())
 
