@@ -721,6 +721,17 @@ class DatabaseConnection:
                 ON s.[{safe_ck}] = p2.[{safe_ck}]
             ORDER BY s.[{safe_ck}]
         """
+        """
+        sql = f
+            SELECT
+                p.[{safe_ck}],
+                l.[{safe_cd}],
+                max(p.[{safe_cnt}])
+            FROM [{safe_tc}] AS p
+            LEFT JOIN [{safe_tl}] AS l
+                ON p.[{safe_ck}] = l.[{safe_ck}]
+            GROUP BY p.[{safe_ck}], l.[{safe_cd}]
+        """
         logger.debug("get_all_plantillas SQL: %s", sql.strip())
 
         try:
