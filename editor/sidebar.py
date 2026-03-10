@@ -55,22 +55,31 @@ class Sidebar(tk.Frame):
         self.field_widgets = {}  # {nombre_campo: widget}
         
         # Canvas + Scrollbar para scroll vertical
+        self._scrollbar = tk.Scrollbar(self, orient="vertical")
+        self._scrollbar.pack(side="right", fill="y")
+        
         self._canvas = tk.Canvas(
-            self, bg=COLOR_SIDEBAR_BG, highlightthickness=0
+            self, bg=COLOR_SIDEBAR_BG, highlightthickness=0,
+            yscrollcommand=self._scrollbar.set
         )
-        self._scrollbar = tk.Scrollbar(
-            self, orient="vertical", command=self._canvas.yview
-        )
-        self._scrollbar = tk.Scrollbar(side="right", fill="y")
+        self._canvas.pack(side="left", fill="both", expand=True)
+        self._scrollbar.config(command=self._canvas.yview)
+        
         self._canvas.pack(side="left", fill="both", expand=True)
         self._canvas.configure(yscrollcommand=self._scrollbar.set)
         
         #Frame interior donde se contruye el contenido
-        self._inner.bind("<Configure>", self._on_frame_configure)
+        self._inner = tk.Frame(self._canvas, bg=COLOR_SIDEBAR_BG)
+        self._canvas_window = self._canvas.create_window(
+            (0, 0), window=self._inner, anchor="nw"
+        )
+
+        #self._inner.bind("<Configure>", self._on_frame_configure)
         self._canvas.bind("<Configure>", self._on_canvas_configure)
-        
-        #Scroll rueda del raton
-        self._canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+        #Scroll con rueda del ratón solo cuando el cursor está encima
+        self._canvas.bind("<Enter>", lambda e: self._canvas.bind_all("<MouseWheel>", self._on_mousewheel))
+        self._canvas.bind("<Leave>", lambda e: self._canvas.unbind_all("<MouseWheel>"))
         
         self._build_ui()
         
