@@ -111,12 +111,16 @@ def _check_blocks(lines: List[str], problemas: List):
                 linea_ref
             ))
         elif open_count < 0:
-            problemas.append((
-                "aviso",
-                f"Cierre extra: {name} "
-                f"({abs(open_count)} cierre{'s' if abs(open_count) > 1 else ''} sin apertura)",
-                0
-            ))
+            #Ignora "End Sub" suelto al inicio - Patron valido para G21
+            if name == "Sub / End Sub":
+                pass
+            else:
+                problemas.append((
+                    "aviso",
+                    f"Cierre extra: {name} "
+                    f"({abs(open_count)} cierre{'s' if abs(open_count) > 1 else ''} sin apertura)",
+                    0
+                ))
 
 
 def _check_quotes(lines: List[str], problemas: List):

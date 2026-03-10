@@ -224,13 +224,13 @@ class EditorApp(tk.Tk):
             return resp
         else:
             # Solo avisos: informar y continuar
-            messagebox.showinfo(
+            resp = messagebox.askyesno(
                 f"Validación del script — {len(avisos)} aviso(s)",
                 f"Se han detectado los siguientes avisos en el script:\n\n"
                 f"{resumen}\n\n"
-                f"El registro se guardará igualmente."
+                f"¿Desea guardar de todos modos?"
             )
-            return True
+            return resp
 
     def _guardar(self, event=None):
         """Guarda el script y campos editados en BD si hay conexión."""
