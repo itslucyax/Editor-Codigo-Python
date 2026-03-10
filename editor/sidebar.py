@@ -54,7 +54,36 @@ class Sidebar(tk.Frame):
         # Referencias a widgets para obtener valores editados
         self.field_widgets = {}  # {nombre_campo: widget}
         
+        # Canvas + Scrollbar para scroll vertical
+        self._canvas = tk.Canvas(
+            self, bg=COLOR_SIDEBAR_BG, highlightthickness=0
+        )
+        self._scrollbar = tk.Scrollbar(
+            self, orient="vertical", command=self._canvas.yview
+        )
+        self._scrollbar = tk.Scrollbar(side="right", fill="y")
+        self._canvas.pack(side="left", fill="both", expand=True)
+        self._canvas.configure(yscrollcommand=self._scrollbar.set)
+        
+        #Frame interior donde se contruye el contenido
+        self._inner.bind("<Configure>", self._on_frame_configure)
+        self._canvas.bind("<Configure>", self._on_canvas_configure)
+        
+        #Scroll rueda del raton
+        self._canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        
         self._build_ui()
+        
+    def _on_frame_configure(self, event=None):
+        self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+    
+    def _on_canvas_configure(self, event=None):
+        #Ajustar ancho del frame interior al canva
+        self._canvas.itemconfig(self._canvas_window, width=event.width)
+    
+    def _on_mousewheel(self, event):
+        self._canvas.yview_scroll(int(-1 * (event.delta / 120 )), "units")
+    
     
     HIDDEN_FIELDS = ["GRUPO"]
 
@@ -113,7 +142,7 @@ class Sidebar(tk.Frame):
             self._build_metadata_section()
         
         # Separador y variables (siempre 10 filas fijas editables)
-        tk.Frame(self, bg="#999", height=1).pack(fill="x", pady=10, padx=5)
+        tk.Frame(self._inner, bg="#999", height=1).pack(fill="x", pady=10, padx=5)
         self._build_variables_section()
     
     def _build_key_section(self):
@@ -121,7 +150,7 @@ class Sidebar(tk.Frame):
         Construye la sección superior con las claves primarias (MODELO, CODIGO, etc).
         Estilo destacado: texto grande y negrita.
         """
-        container = tk.Frame(self, bg=COLOR_SIDEBAR_BG)
+        container = tk.Frame(self._inner, bg=COLOR_SIDEBAR_BG)
         container.pack(fill="x", padx=10, pady=(10, 5))
         
         for key_col in self.key_columns:
@@ -171,7 +200,7 @@ class Sidebar(tk.Frame):
         letra = modelo_value[0].upper()
         descripcion = self.TIPO_MAP.get(letra, letra)
         
-        container = tk.Frame(self, bg=COLOR_SIDEBAR_BG)
+        container = tk.Frame(self._inner, bg=COLOR_SIDEBAR_BG)
         container.pack(fill="x", padx=10, pady=(0, 5))
         
         tk.Label(
@@ -197,7 +226,7 @@ class Sidebar(tk.Frame):
         Construye la sección de campos de metadata.
         Campos editables tienen Entry, campos readonly tienen Label.
         """
-        container = tk.Frame(self, bg=COLOR_SIDEBAR_BG)
+        container = tk.Frame(self._inner, bg=COLOR_SIDEBAR_BG)
         container.pack(fill="x", padx=10, pady=(5, 10))
         
         for field_name, value in self.metadata_fields:
@@ -247,7 +276,7 @@ class Sidebar(tk.Frame):
     
     def _build_variables_section(self):
         """Construye la sección inferior con 10 filas fijas (Var 0 a Var 9) editables."""
-        container = tk.Frame(self, bg=COLOR_SIDEBAR_BG)
+        container = tk.Frame(self._inner, bg=COLOR_SIDEBAR_BG)
         container.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         
         # Cabecera de sección
