@@ -62,11 +62,14 @@ class EditorApp(tk.Tk):
         if self.context_type:
             ctx_label = f" [{self.context_type.capitalize()}]"
         
-        if self.key_columns and self.record:
-            key_display = " / ".join(str(self.record.get(k, "")) for k in self.key_columns)
-            self.title(f"Editor VBS{ctx_label} - {key_display}")
-        else:
-            self.title(f"Editor VBS{ctx_label} - Local")
+            if self.context_type == "plantilla":
+                plantilla_nombre = self.record.get("NOMBRE") or self.record.get("CODIGO") or "Sin nombre"
+                self.title(f"Editor VBS{ctx_label} - {plantilla_nombre}")
+            elif self.key_columns and self.record:
+                key_display = " / ".join(str(self.record.get(k, "")) for k in self.key_columns)
+                self.title(f"Editor VBS{ctx_label} - {key_display}")
+            else:
+                self.title(f"Editor VBS{ctx_label} - Local")
         
         self.configure(bg=COLOR_FONDO)
         self.geometry("1100x650")
