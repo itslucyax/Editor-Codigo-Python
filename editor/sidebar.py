@@ -56,6 +56,8 @@ class Sidebar(tk.Frame):
         
         self._build_ui()
     
+    HIDDEN_FIELDS = ["GRUPO"]
+
     def _categorize_fields(self):
         """
         Categoriza los campos del registro en:
@@ -72,6 +74,10 @@ class Sidebar(tk.Frame):
             if field_upper in self.key_columns or field_upper == self.content_column:
                 continue
             
+            #Campos ocultos temporalmente
+            if field_upper in [f.upper() for f in self.HIDDEN_FIELDS]:
+                continue
+
             # Detectar variables: VAR0-VAR9 o TABLACAMPO0-TABLACAMPO9
             # Solo incluir si tiene valor (no vacio)
             if field_upper.startswith("VAR") and len(field_upper) <= 4:
