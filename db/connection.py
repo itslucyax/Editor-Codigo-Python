@@ -200,84 +200,45 @@ def parse_connection_string(conn_str: str) -> Dict[str, str]:
 
     # ------------------------------------------------------------------
     # Detectar formato extendido de Gestión 21
-    # El valor de 'database' puede contener tokens extra separados por espacio:
+    # El último token es SIEMPRE el flag: D=Documento, P=Plantilla.
     #
-    # Formato DOCUMENTO (4 tokens):
-    #   "datosABEL T01 BOBINADO D"  →  database=datosABEL, modelo=T01, codigo=BOBINADO, tipo=documento
-    #   Tabla: G_SCRIPT, clave: MODELO+CODIGO
+    # Formato DOCUMENTO (flag=D, mínimo 4 tokens):
+    #   "datosABEL T01 BOBINADO D"         → db=datosABEL, modelo=T01, codigo=BOBINADO
+    #   Los 3 últimos tokens son: MODELO CODIGO D
+    #   Todo lo anterior es el nombre de la BD.
     #
-    # Formato PLANTILLA (3 tokens):
-    #   "dato01ABEL A P"            →  database=dato01ABEL, modelo=A, tipo=plantilla
-    #   Tabla: E_PROGRA, clave: Plantilla (solo la letra)
-    #
-    # El último token es siempre el flag D=Documento, P=Plantilla.
+    # Formato PLANTILLA (flag=P, mínimo 3 tokens, puede tener más):
+    #   "dato01ABEL A P"                   → db=dato01ABEL, modelo=A
+    #   "datosABEL O01 APLICACION P"       → db=datosABEL, modelo=O01  (APLICACION se ignora)
+    #   Siempre: primer token=BD, segundo token=MODELO, resto hasta P se ignora.
     # ------------------------------------------------------------------
     db_raw = result.get("database", "")
     tokens = db_raw.split()
     if len(tokens) >= 3:
         flag = tokens[-1].upper()
         if flag in _TIPO_FLAG_MAP:
-            if flag == "P" and len(tokens) == 3:
-                # Plantilla: BD LETRA P  →  sin CODIGO
-                result["database"] = tokens[0]           # nombre real de la BD
-                result["modelo"]   = tokens[1]           # letra de plantilla (ej: "A")
-                result["codigo"]   = None                # plantillas no tienen CODIGO
+            if flag == "P":
+                # Plantilla: primer token=BD, segundo token=MODELO, resto ignorado
+                result["database"] = tokens[0]
+                result["modelo"]   = tokens[1]
+                result["codigo"]   = None
                 result["tipo"]     = CONTEXT_PLANTILLA
+                ignored = tokens[2:-1]
                 logger.info(
-                    "Formato plantilla detectado: db=%s, plantilla=%s",
+                    "Formato plantilla detectado: db=%s, plantilla=%s%s",
                     result["database"], result["modelo"],
+                    f" (tokens ignorados: {ignored})" if ignored else "",
                 )
-            elif len(tokens) >= 4:
-                # Documento: BD MODELO CODIGO D
-                result["database"] = " ".join(tokens[:-3])  # nombre real de la BD
-                result["modelo"]   = tokens[-3]              # ej: "T01"
-                result["codigo"]   = tokens[-2]              # ej: "BOBINADO"
+            else:
+                # Documento (flag=D): los 3 últimos son MODELO CODIGO D
+                result["database"] = " ".join(tokens[:-3])
+                result["modelo"]   = tokens[-3]
+                result["codigo"]   = tokens[-2]
                 result["tipo"]     = CONTEXT_DOCUMENTO
                 logger.info(
                     "Formato documento detectado: db=%s, modelo=%s, codigo=%s",
                     result["database"], result["modelo"], result["codigo"],
                 )
-        # ------------------------------------------------------------------
-        # Detectar formato extendido de Gestión 21
-        # El último token es SIEMPRE el flag: D=Documento, P=Plantilla.
-        #
-        # Formato DOCUMENTO (flag=D, mínimo 4 tokens):
-        #   "datosABEL T01 BOBINADO D"         → db=datosABEL, modelo=T01, codigo=BOBINADO
-        #   Los 3 últimos tokens son: MODELO CODIGO D
-        #   Todo lo anterior es el nombre de la BD.
-        #
-        # Formato PLANTILLA (flag=P, mínimo 3 tokens, puede tener más):
-        #   "dato01ABEL A P"                   → db=dato01ABEL, modelo=A
-        #   "datosABEL O01 APLICACION P"       → db=datosABEL, modelo=O01  (APLICACION se ignora)
-        #   Siempre: primer token=BD, segundo token=MODELO, resto hasta P se ignora.
-        # ------------------------------------------------------------------
-        db_raw = result.get("database", "")
-        tokens = db_raw.split()
-        if len(tokens) >= 3:
-            flag = tokens[-1].upper()
-            if flag in _TIPO_FLAG_MAP:
-                if flag == "P":
-                    # Plantilla: primer token=BD, segundo token=MODELO, resto ignorado
-                    result["database"] = tokens[0]
-                    result["modelo"]   = tokens[1]
-                    result["codigo"]   = None
-                    result["tipo"]     = CONTEXT_PLANTILLA
-                    ignored = tokens[2:-1]
-                    logger.info(
-                        "Formato plantilla detectado: db=%s, plantilla=%s%s",
-                        result["database"], result["modelo"],
-                        f" (tokens ignorados: {ignored})" if ignored else "",
-                    )
-                else:
-                    # Documento (flag=D): los 3 últimos son MODELO CODIGO D
-                    result["database"] = " ".join(tokens[:-3])
-                    result["modelo"]   = tokens[-3]
-                    result["codigo"]   = tokens[-2]
-                    result["tipo"]     = CONTEXT_DOCUMENTO
-                    logger.info(
-                        "Formato documento detectado: db=%s, modelo=%s, codigo=%s",
-                        result["database"], result["modelo"], result["codigo"],
-                    )
 
     # Normalizar trust_server_certificate a booleano-string
     if "trust_server_certificate" in result:
@@ -761,17 +722,6 @@ class DatabaseConnection:
             LEFT JOIN [{safe_tc}] p2
                 ON s.[{safe_ck}] = p2.[{safe_ck}]
             ORDER BY s.[{safe_ck}]
-        """
-        """
-        sql = f
-            SELECT
-                p.[{safe_ck}],
-                l.[{safe_cd}],
-                max(p.[{safe_cnt}])
-            FROM [{safe_tc}] AS p
-            LEFT JOIN [{safe_tl}] AS l
-                ON p.[{safe_ck}] = l.[{safe_ck}]
-            GROUP BY p.[{safe_ck}], l.[{safe_cd}]
         """
         logger.debug("get_all_plantillas SQL: %s", sql.strip())
 
