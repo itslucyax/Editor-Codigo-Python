@@ -100,10 +100,10 @@ class EditorApp(tk.Tk):
             self.sidebar.pack(side="left", fill="y")
 
         # 2) Separador visual entre sidebar y números de línea
-        self.separator = tk.Frame(self.main_frame, width=SEPARADOR_ANCHO, bg=COLOR_SEPARADOR)
+        self.separator = tk.Frame(self.main_frame, width=0, bg=COLOR_SEPARADOR)
         # Ocultar separador en plantillas
         if self.context_type != "plantilla":
-            self.separator.pack(side="left", fill="y", padx=5)
+            self.separator.pack(side="left", fill="y", padx=0)
 
         # 3) Frame derecho (barras superiores + área de edición)
         right_frame = tk.Frame(self.main_frame, bg=COLOR_FONDO)
