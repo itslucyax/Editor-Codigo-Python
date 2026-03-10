@@ -737,7 +737,11 @@ class DatabaseConnection:
             descri  = "" if row[1] is None else str(row[1]).strip()
             content = "" if row[2] is None else str(row[2]).strip()
 
-            label = f"{clave} - {descri}" if descri else clave
+            #Si no tiene descri, esta sin usar -> no mostrar en el desplegable
+            if not descri or not descri.strip():
+                continue
+            
+            label = f"{clave} - {descri}"
 
             plantillas.append({
                 "label":      label,
