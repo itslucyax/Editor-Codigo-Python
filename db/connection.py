@@ -715,7 +715,7 @@ class DatabaseConnection:
                     p.[{safe_ck}]  AS [{safe_ck}],
                     l.[{safe_cd}]  AS [{safe_cd}]
                 FROM [{safe_tc}] p
-                LEFT JOIN [{safe_tl}] l
+                INNER JOIN [{safe_tl}] l
                     ON p.[{safe_ck}] = l.[{safe_ck}]
                 GROUP BY p.[{safe_ck}], l.[{safe_cd}]
             ) AS s
@@ -737,9 +737,9 @@ class DatabaseConnection:
             descri  = "" if row[1] is None else str(row[1]).strip()
             content = "" if row[2] is None else str(row[2]).strip()
 
-            #Si no tiene descri, esta sin usar -> no mostrar en el desplegable
-            if not descri or not descri.strip():
-                continue
+            #Si no tiene descri, esta sin usar -> no mostrar en el desplegable --> solucionado en connection.py cambiando de Left Join a INNER JOIN (mas limpio)
+            #if not descri or not descri.strip():
+                #continue
             
             label = f"{clave} - {descri}"
 
