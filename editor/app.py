@@ -122,6 +122,15 @@ class EditorApp(tk.Tk):
         )
         self.script_selector.pack(side="top", fill="x")
 
+        #Posicionar el desplegable en el registro actualmente abierto
+        if self.key_columns and self.record:
+            current_key = str(self.record.get(self.key_columns[0], "")).strip()
+            for i, script in enumerate(self.scripts_list):
+                kv = script.get("key_values", [])
+                if kv and str(kv[0]).strip() == current_key:
+                    self.script_selector.combo.current(i)
+                    break
+
         # 4b) Barra de búsqueda fija (siempre visible)
         self.fixed_search = FixedSearchBar(right_frame)
         self.fixed_search.pack(side="top", fill="x")
