@@ -1,19 +1,18 @@
- select s.plantilla,s.descri,p2.texto from 
-
-( select 
-  
- p.plantilla as plantilla,
- l.descri as descri
- 
- from e_progra as p
-
- left join e_planti as l
-
- on p.plantilla = l.plantilla
-
- group by p.plantilla, l.descri 
- )   as s
-
- left join e_progra as p2
-
- on s.plantilla = p2.plantilla
+Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (ultimos-detalles)
+$ python3 main.py --connection-string "driver={SQL Server};server=GG\SQL2019;uid=sa;pwd=sa;database=DATO01ABEL A APLICACION P"
+Traceback (most recent call last):
+  File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\main.py", line 555, in <modu
+le>
+    main()
+  File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\main.py", line 534, in main
+    app = EditorApp(
+          ^^^^^^^^^^
+  File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\editor\app.py", line 66, in
+__init__
+    plantilla_key = self.key._cplumns[0] if self.key_columns else "PLANTILLA"
+                    ^^^^^^^^
+  File "C:\Users\Lucia\AppData\Local\Programs\Python\Python312\Lib\tkinter\__ini
+t__.py", line 2433, in __getattr__
+    return getattr(self.tk, attr)
+           ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: '_tkinter.tkapp' object has no attribute 'key'
