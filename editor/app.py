@@ -286,6 +286,9 @@ class EditorApp(tk.Tk):
             key_values = [str(self.record.get(k, "")) for k in self.key_columns]
             
             try:
+                print("DEBUG key_columns:", self.key_columns)
+                print("DEBUG key_values:", key_values)
+                print("DEBUG record keys:", list(self.record.keys()))
                 ok = self.db.save_record_full(self.key_columns, key_values, campos_editados)
                 if not ok:
                     key_display = ", ".join(f"{k}={v}" for k, v in zip(self.key_columns, key_values))
