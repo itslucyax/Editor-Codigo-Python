@@ -133,7 +133,7 @@ class EditorApp(tk.Tk):
             current_key = str(self.record.get(self.key_columns[0], "")).strip()
             for i, script in enumerate(self.scripts_list):
                 kv = script.get("key_values", [])
-                if kv and str(kv[0]).strip() == current_key:
+                if kv and str(kv[0]).strip().upper() == current_key.upper():
                     self.script_selector.combo.current(i)
                     break
 
@@ -173,8 +173,9 @@ class EditorApp(tk.Tk):
         self.text_editor.bind("<KeyRelease>",      self._update_status)
         self.text_editor.bind("<ButtonRelease-1>", self._update_status)
 
-        # Cargar contenido inicial
+         # Cargar contenido inicial
         self.text_editor.set_content(inicial_text)
+        self.text_editor.edit_reset()
 
         # Atajos de teclado
         self.bind_all("<Control-s>", self._guardar)
@@ -286,9 +287,6 @@ class EditorApp(tk.Tk):
             key_values = [_get_record_val(self.record, k) for k in self.key_columns]
             
             try:
-                print("DEBUG key_columns:", self.key_columns)
-                print("DEBUG key_values:", key_values)
-                print("DEBUG record keys:", list(self.record.keys()))
                 ok = self.db.save_record_full(self.key_columns, key_values, campos_editados)
                 if not ok:
                     key_display = ", ".join(f"{k}={v}" for k, v in zip(self.key_columns, key_values))
@@ -342,6 +340,7 @@ class EditorApp(tk.Tk):
                 # Actualizar contenido del editor
                 content = new_record.get(self.content_column, script_data.get("content", ""))
                 self.text_editor.set_content(content)
+                self.text_editor.edit_reset()
                 
                 # Reconstruir sidebar con los nuevos datos
                 self.sidebar.destroy()
@@ -370,7 +369,8 @@ class EditorApp(tk.Tk):
             # Modo local o sin key_values: solo cambiar contenido
             content = script_data.get("content", "")
             self.text_editor.set_content(content)
-        
+            self.text_editor.edit_reset()
+            
         self.text_editor.edit_reset()
         self.text_editor.edit_modified(False)
         self._update_status()
