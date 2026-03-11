@@ -709,19 +709,10 @@ class DatabaseConnection:
         safe_cnt = _sanitize_identifier(col_contenido,   "col_contenido")
 
         sql = f"""
-            SELECT s.[{safe_ck}], s.[{safe_cd}], p2.[{safe_cnt}]
-            FROM (
-                SELECT
-                    p.[{safe_ck}]  AS [{safe_ck}],
-                    l.[{safe_cd}]  AS [{safe_cd}]
-                FROM [{safe_tc}] p
-                INNER JOIN [{safe_tl}] l
-                    ON p.[{safe_ck}] = l.[{safe_ck}]
-                GROUP BY p.[{safe_ck}], l.[{safe_cd}]
-            ) AS s
-            LEFT JOIN [{safe_tc}] p2
-                ON s.[{safe_ck}] = p2.[{safe_ck}]
-            ORDER BY s.[{safe_ck}]
+            SELECT [{safe_ck}], [{safe_cd}]
+            FROM [{safe_tl}]
+            WHERE [{safe_cd}] IS NOT NULL AND [{safe_cd}] <> ''
+            ORDER BY [{safe_ck}]
         """
         logger.debug("get_all_plantillas SQL: %s", sql.strip())
 
@@ -735,7 +726,6 @@ class DatabaseConnection:
         for row in rows:
             clave   = "" if row[0] is None else str(row[0]).strip()
             descri  = "" if row[1] is None else str(row[1]).strip()
-            content = "" if row[2] is None else str(row[2]).strip()
 
             #Si no tiene descri, esta sin usar -> no mostrar en el desplegable --> solucionado en connection.py cambiando de Left Join a INNER JOIN (mas limpio)
             #if not descri or not descri.strip():
@@ -746,7 +736,7 @@ class DatabaseConnection:
             plantillas.append({
                 "label":      label,
                 "key_values": [clave],
-                "content":    content,
+                "content":    "", #Se carga al seleccionar
             })
 
         logger.info("get_all_plantillas: %d plantillas encontradas", len(plantillas))
