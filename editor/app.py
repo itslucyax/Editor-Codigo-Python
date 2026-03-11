@@ -156,12 +156,7 @@ class EditorApp(tk.Tk):
 
         # 6) Editor de texto con scrollbar vertical
         self.text_editor = TextEditor(editor_frame)
-        self._editor_scrollbar = tk.Scrollbar(editor_frame, orient="vertical", command=self.text_editor.yview)
-        self._editor_scrollbar.pack(side="right", fill="y")
-        self.text_editor.configure(yscrollcommand=self._editor_scrollbar.set)
-
-        # 8) Editor a la derecha
-        self.text_editor.pack(side="right", fill="both", expand=True)
+        self.text_editor.configure(yscrollcommand=self._editor_scrollbar.set) if hasattr(self, '_editor_scrollbar') else None
 
         # Conectar barra de búsqueda fija al editor de texto
         self.fixed_search.set_text_widget(self.text_editor)
@@ -169,11 +164,19 @@ class EditorApp(tk.Tk):
         # Botón guardar en la barra de búsqueda (a la derecha de las flechas)
         self.fixed_search.add_save_button(self._guardar, self.status_var, self._update_status)
 
-        # 7) Números de línea
+        # 7) Scrollbar del editor (se empaqueta primero para que quede a la derecha)
+        self._editor_scrollbar = tk.Scrollbar(editor_frame, orient="vertical", command=self.text_editor.yview)
+        self._editor_scrollbar.pack(side="right", fill="y")
+        self.text_editor.configure(yscrollcommand=self._editor_scrollbar.set)
+
+        # 8) Números de línea a la izquierda
         self.line_numbers = LineNumbers(editor_frame, self.text_editor)
         self.line_numbers.pack(side="left", fill="y")
 
-        # 9) Barra de búsqueda/reemplazo flotante (Ctrl+H)
+        # 9) Editor ocupa el resto
+        self.text_editor.pack(side="left", fill="both", expand=True)
+
+        # 10) Barra de búsqueda/reemplazo flotante (Ctrl+H)
         self.search_bar = SearchBar(self.text_editor, self.text_editor)
 
         # Eventos para actualizar status
