@@ -160,6 +160,9 @@ class EditorApp(tk.Tk):
         self._editor_scrollbar.pack(side="right", fill="y")
         self.text_editor.configure(yscrollcommand=self._editor_scrollbar.set)
 
+        # 8) Editor a la derecha
+        self.text_editor.pack(side="right", fill="both", expand=True)
+
         # Conectar barra de búsqueda fija al editor de texto
         self.fixed_search.set_text_widget(self.text_editor)
 
@@ -169,9 +172,6 @@ class EditorApp(tk.Tk):
         # 7) Números de línea
         self.line_numbers = LineNumbers(editor_frame, self.text_editor)
         self.line_numbers.pack(side="left", fill="y")
-
-        # 8) Editor a la derecha
-        self.text_editor.pack(side="right", fill="both", expand=True)
 
         # 9) Barra de búsqueda/reemplazo flotante (Ctrl+H)
         self.search_bar = SearchBar(self.text_editor, self.text_editor)

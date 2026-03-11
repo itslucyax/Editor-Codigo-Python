@@ -54,16 +54,11 @@ class Sidebar(tk.Frame):
         # Referencias a widgets para obtener valores editados
         self.field_widgets = {}  # {nombre_campo: widget}
         
-        # Canvas + Scrollbar para scroll vertical
-        self._scrollbar = tk.Scrollbar(self, orient="vertical")
-        self._scrollbar.pack(side="right", fill="y")
-
+        # Canvas para scroll vertical
         self._canvas = tk.Canvas(
-            self, bg=COLOR_SIDEBAR_BG, highlightthickness=0,
-            yscrollcommand=self._scrollbar.set
+            self, bg=COLOR_SIDEBAR_BG, highlightthickness=0
         )
         self._canvas.pack(side="left", fill="both", expand=True)
-        self._scrollbar.config(command=self._canvas.yview)
 
         # Frame interior donde se construye el contenido
         self._inner = tk.Frame(self._canvas, bg=COLOR_SIDEBAR_BG)
