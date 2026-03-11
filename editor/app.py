@@ -64,13 +64,18 @@ class EditorApp(tk.Tk):
         
             if self.context_type == "plantilla":
                 plantilla_key = self.key_columns[0] if self.key_columns else "PLANTILLA"
-                plantilla_val = (
-                    self.record.get(plantilla_key)
-                    or self.record.get(plantilla_key.upper())
-                    or self.record.get(plantilla_key.lower())
-                    or "Sin nombre"
-                )
-                self.title(f"Editor VBS{ctx_label} - {plantilla_val}")
+                plantilla_val = ""
+                for k, v in self.record.items():
+                    if k.upper() == plantilla_key.upper():
+                        plantilla_val = str(v).strip()
+                        break
+                # Buscar el label completo (ej: "P - Plano") en la lista del desplegable
+                for script in (scripts_list or []):
+                    kv = script.get("key_values", [])
+                    if kv and str(kv[0]).strip().upper() == plantilla_val.upper():
+                        plantilla_val = script.get("label", plantilla_val)
+                        break
+                self.title(f"Editor VBS{ctx_label} - {plantilla_val or 'Sin nombre'}")
             elif self.key_columns and self.record:
                 key_display = " / ".join(str(self.record.get(k, "")) for k in self.key_columns)
                 self.title(f"Editor VBS{ctx_label} - {key_display}")
