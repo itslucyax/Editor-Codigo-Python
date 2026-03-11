@@ -68,6 +68,7 @@ class Sidebar(tk.Frame):
 
         self._inner.bind("<Configure>", self._on_frame_configure)
         self._canvas.bind("<Configure>", self._on_canvas_configure)
+        self.bind("<Configure>", lambda e: self.after(50, self._on_frame_configure))
 
         # Scroll con rueda del ratón solo cuando el cursor está encima
         self._canvas.bind("<Enter>", lambda e: self._canvas.bind_all("<MouseWheel>", self._on_mousewheel))
@@ -78,6 +79,7 @@ class Sidebar(tk.Frame):
         
     def _on_frame_configure(self, event=None):
         self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+        self._canvas.update_idletasks()
     
     def _on_canvas_configure(self, event=None):
         #Ajustar ancho fijo del frame interior
@@ -146,8 +148,6 @@ class Sidebar(tk.Frame):
         # Separador y variables (siempre 10 filas fijas editables)
         tk.Frame(self._inner, bg="#999", height=1).pack(fill="x", pady=10, padx=5)
         self._build_variables_section()
-        
-        # ...existing code...
     
     def _build_key_section(self):
         """
@@ -236,8 +236,6 @@ class Sidebar(tk.Frame):
         for field_name, value in self.metadata_fields:
             field_upper = field_name.upper()
             is_editable = field_upper in self.editable_columns
-            
-            # Frame para cada campo
             field_frame = tk.Frame(container, bg=COLOR_SIDEBAR_BG)
             field_frame.pack(fill="x", pady=3)
             
