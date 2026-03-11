@@ -79,8 +79,8 @@ class Sidebar(tk.Frame):
         self._canvas.configure(scrollregion=self._canvas.bbox("all"))
     
     def _on_canvas_configure(self, event=None):
-        #Ajustar ancho del frame interior al canva
-        self._canvas.itemconfig(self._canvas_window, width=event.width)
+        #Ajustar ancho fijo del frame interior
+        self._canvas.itemconfig(self._canvas_window, width=self.WIDTH - 4)
     
     def _on_mousewheel(self, event):
         self._canvas.yview_scroll(int(-1 * (event.delta / 120 )), "units")
