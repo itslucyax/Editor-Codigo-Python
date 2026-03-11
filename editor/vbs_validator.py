@@ -111,7 +111,10 @@ def _check_blocks(lines: List[str], problemas: List):
                 linea_ref
             ))
         elif open_count < 0:
+            #Cierre sin apertura ignorado - Patron valido en G21
+            pass
             #Ignora "End Sub" suelto al inicio - Patron valido para G21
+            """
             if name == "Sub / End Sub":
                 pass
             else:
@@ -121,7 +124,7 @@ def _check_blocks(lines: List[str], problemas: List):
                     f"({abs(open_count)} cierre{'s' if abs(open_count) > 1 else ''} sin apertura)",
                     0
                 ))
-
+            """
 
 def _check_quotes(lines: List[str], problemas: List):
     """Comprueba comillas dobles sin cerrar en cada línea."""
