@@ -63,7 +63,7 @@ class EditorApp(tk.Tk):
             ctx_label = f" [{self.context_type.capitalize()}]"
         
             if self.context_type == "plantilla":
-                self.key._columns[0] if self.key_columns else "PLANTILLA"
+                plantilla_val = self.key_columns[0] if self.key_columns else "PLANTILLA"
                 plantilla_val = (
                     self.record.get(plantilla_key)
                     or self.record.get(plantilla_key.upper())
