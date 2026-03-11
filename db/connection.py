@@ -709,9 +709,10 @@ class DatabaseConnection:
         safe_cnt = _sanitize_identifier(col_contenido,   "col_contenido")
 
         sql = f"""
-            SELECT [{safe_ck}], [{safe_cd}]
+            SELECT [{safe_ck}], MAX([{safe_cd}]) AS [{safe_cd}]
             FROM [{safe_tl}]
             WHERE [{safe_cd}] IS NOT NULL AND [{safe_cd}] <> ''
+            GROUP BY [{safe_ck}]
             ORDER BY [{safe_ck}]
         """
         logger.debug("get_all_plantillas SQL: %s", sql.strip())
