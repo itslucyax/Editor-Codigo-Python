@@ -1,20 +1,4 @@
 Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (ultimos-detalles)
-$ git pull origin ultimos-detalles
-remote: Enumerating objects: 5, done.
-remote: Counting objects: 100% (5/5), done.
-remote: Compressing objects: 100% (3/3), done.
-remote: Total 3 (delta 2), reused 0 (delta 0), pack-reused 0 (from 0)
-Unpacking objects: 100% (3/3), 931 bytes | 66.00 KiB/s, done.
-From https://github.com/itslucyax/Editor-Codigo-Python
- * branch            ultimos-detalles -> FETCH_HEAD
-   4c5d14e..0d762f4  ultimos-detalles -> origin/ultimos-detalles
-Updating 067f4f7..0d762f4
-error: Your local changes to the following files would be overwritten by merge:
-        editor/app.py
-Please commit your changes or stash them before you merge.
-Aborting
-
-Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (ultimos-detalles)
 $ python3 main.py --connection-string "driver={SQL Server};server=GG\SQL2019;uid=sa;pwd=sa;database=DATO01ABEL A APLICACION P"
 Traceback (most recent call last):
   File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\main.py", line 555, in <module>
@@ -22,13 +6,7 @@ Traceback (most recent call last):
   File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\main.py", line 534, in main
     app = EditorApp(
           ^^^^^^^^^^
-  File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\editor\app.py", line 66, in __init__
-    self.key._columns[0] if self.key_columns else "PLANTILLA"
-    ^^^^^^^^
-  File "C:\Users\Lucia\AppData\Local\Programs\Python\Python312\Lib\tkinter\__init__.py", line 2433, in __geta
-ttr__
-    return getattr(self.tk, attr)
-           ^^^^^^^^^^^^^^^^^^^^^^
-AttributeError: '_tkinter.tkapp' object has no attribute 'key'
-
-Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (ultimos-detalles)
+  File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\editor\app.py", line 68, in __init__
+    self.record.get(plantilla_key)
+                    ^^^^^^^^^^^^^
+NameError: name 'plantilla_key' is not defined. Did you mean: 'plantilla_val'?
