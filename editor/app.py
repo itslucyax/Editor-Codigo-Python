@@ -63,7 +63,7 @@ class EditorApp(tk.Tk):
             ctx_label = f" [{self.context_type.capitalize()}]"
         
             if self.context_type == "plantilla":
-                plantilla_val = self.key_columns[0] if self.key_columns else "PLANTILLA"
+                plantilla_key = self.key_columns[0] if self.key_columns else "PLANTILLA"
                 plantilla_val = (
                     self.record.get(plantilla_key)
                     or self.record.get(plantilla_key.upper())
@@ -269,11 +269,11 @@ class EditorApp(tk.Tk):
             # Agregar contenido del script a los campos actualizados
             #Nombre exacto de columna del record para evitar problemas de capitalización
             content_col_real = self.content_column
-            for k in self.upper.record.keys():
-                if k in self.content_column.upper():
+            for k in self.record.keys():
+                if k.upper() == self.content_column.upper():
                     content_col_real = k
                     break
-            campos_editados[self.content_column] = contenido
+            campos_editados[content_col_real] = contenido
             
             # Obtener valores de las claves (busqueda case-sensitive en el record)
             def _get_record_val(record, key):
@@ -282,7 +282,7 @@ class EditorApp(tk.Tk):
                 for k, v in record.items():
                     if k.upper() == key.upper():
                         return str(v)
-                    return ""
+                return ""
             key_values = [str(self.record.get(k, "")) for k in self.key_columns]
             
             try:
