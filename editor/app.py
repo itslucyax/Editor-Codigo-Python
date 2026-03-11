@@ -63,8 +63,14 @@ class EditorApp(tk.Tk):
             ctx_label = f" [{self.context_type.capitalize()}]"
         
             if self.context_type == "plantilla":
-                plantilla_nombre = self.record.get("NOMBRE") or self.record.get("CODIGO") or "Sin nombre"
-                self.title(f"Editor VBS{ctx_label} - {plantilla_nombre}")
+                plantilla_key = self.key._cplumns[0] if self.key_columns else "PLANTILLA"
+                plantilla_val = (
+                    self.record.get(plantilla_key)
+                    or self.record.get(plantilla_key.upper())
+                    or self.record.get(plantilla_key.lower())
+                    or "Sin nombre"
+                )
+                self.title(f"Editor VBS{ctx_label} - {plantilla_val}")
             elif self.key_columns and self.record:
                 key_display = " / ".join(str(self.record.get(k, "")) for k in self.key_columns)
                 self.title(f"Editor VBS{ctx_label} - {key_display}")
@@ -261,9 +267,22 @@ class EditorApp(tk.Tk):
             campos_editados.update(variable_values)
             
             # Agregar contenido del script a los campos actualizados
+            #Nombre exacto de columna del record para evitar problemas de capitalización
+            content_col_real = self.content_column
+            for k in self.upper.record.keys():
+                if k in self.content_column.upper():
+                    content_col_real = k
+                    break
             campos_editados[self.content_column] = contenido
             
-            # Obtener valores de las claves
+            # Obtener valores de las claves (busqueda case-sensitive en el record)
+            def _get_record_val(record, key):
+                if key in record:
+                    return str(record[key])
+                for k, v in record.items():
+                    if k.upper() == key.upper():
+                        return str(v)
+                    return ""
             key_values = [str(self.record.get(k, "")) for k in self.key_columns]
             
             try:
