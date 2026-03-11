@@ -154,8 +154,11 @@ class EditorApp(tk.Tk):
         editor_frame = tk.Frame(right_frame, bg=COLOR_FONDO)
         editor_frame.pack(fill="both", expand=True)
 
-        # 6) Editor de texto (se crea antes que line_numbers porque este lo necesita)
+        # 6) Editor de texto con scrollbar vertical
         self.text_editor = TextEditor(editor_frame)
+        self._editor_scrollbar = tk.Scrollbar(editor_frame, orient="vertical", command=self.text_editor.yview)
+        self._editor_scrollbar.pack(side="right", fill="y")
+        self.text_editor.configure(yscrollcommand=self._editor_scrollbar.set)
 
         # Conectar barra de búsqueda fija al editor de texto
         self.fixed_search.set_text_widget(self.text_editor)

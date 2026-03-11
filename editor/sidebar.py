@@ -150,6 +150,9 @@ class Sidebar(tk.Frame):
         # Separador y variables (siempre 10 filas fijas editables)
         tk.Frame(self._inner, bg="#999", height=1).pack(fill="x", pady=10, padx=5)
         self._build_variables_section()
+        
+        self._inner.update_idletasks()
+        self._on_frame_configure()
     
     def _build_key_section(self):
         """
