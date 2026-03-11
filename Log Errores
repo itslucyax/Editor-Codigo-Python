@@ -14,3 +14,4 @@ ttr__
     return getattr(self.tk, attr)
            ^^^^^^^^^^^^^^^^^^^^^^
 AttributeError: '_tkinter.tkapp' object has no attribute 'key'
+
