@@ -12,40 +12,48 @@ class TextEditor(tk.Text):
     """
     Widget de texto con resaltado para VBS/VB.
     """
-    def __init__(self, master, **kwargs):
-        super().__init__(
-            master,
-            undo=True,
-            bg=COLOR_FONDO,
-            fg=COLOR_TEXTO,
-            font=FUENTE_EDITOR,
-            insertbackground=COLOR_CURSOR,
-            selectbackground=COLOR_SELECCION,
-            wrap="none",                 # Sin wrap
-            **kwargs
+    def __init__(self, master, record=None, key_columns=None, content_column=None, editable_columns=None):
+        super().__init__(master, bg=COLOR_SIDEBAR_BG, width=self.WIDTH)
+        self.pack_propagate(False)  # Mantener ancho fijo
+
+        self.record = record or {}
+        self.key_columns = [c.upper() for c in (key_columns or [])]
+        self.content_column = content_column.upper()
+        self.editable_columns = [c.upper() for c in (editable_columns or [])]
+
+        # Separar campos en categorías
+        self._categorize_fields()
+
+        # Referencias a widgets para obtener valores editados
+        self.field_widgets = {}  # {nombre_campo: widget}
+
+        # Scrollbar + Canvas para scroll vertical
+        self._scrollbar = tk.Scrollbar(self, orient="vertical")
+        self._scrollbar.pack(side="right", fill="y")
+
+        self._canvas = tk.Canvas(
+            self, bg=COLOR_SIDEBAR_BG, highlightthickness=0,
+            yscrollcommand=self._scrollbar.set
+        )
+        self._canvas.pack(side="left", fill="both", expand=True)
+        self._scrollbar.config(command=self._canvas.yview)
+
+        # Frame interior donde se construye el contenido
+        self._inner = tk.Frame(self._canvas, bg=COLOR_SIDEBAR_BG)
+        self._canvas_window = self._canvas.create_window(
+            (0, 0), window=self._inner, anchor="nw"
         )
 
-        self.highlighter = VBHighlighter(self)
+        self._inner.bind("<Configure>", self._on_frame_configure)
+        self._canvas.bind("<Configure>", self._on_canvas_configure)
 
-        # Debounce: id del after pendiente
-        self._highlight_after_id = None
+        # Scroll con rueda del ratón solo cuando el cursor está encima
+        self._canvas.bind("<Enter>", lambda e: self._canvas.bind_all("<MouseWheel>", self._on_mousewheel))
+        self._canvas.bind("<Leave>", lambda e: self._canvas.unbind_all("<MouseWheel>"))
 
-        # Eventos que cambian contenido - capturamos todos los posibles
-        self.bind("<KeyRelease>", self._on_key_release)
-        self.bind("<Key>", self._schedule_highlight_fast)
-        self.bind("<ButtonRelease-1>", self._schedule_highlight)
-        self.bind("<<Paste>>", self._do_highlight_now)
-        self.bind("<<Cut>>", self._do_highlight_now)
-        self.bind("<<Undo>>", self._do_highlight_now)
-        self.bind("<<Redo>>", self._do_highlight_now)
-        self.bind("<<Modified>>", self._schedule_highlight_fast)
-
-        # Para que numeros de linea / status se actualicen siempre
-        self.bind("<KeyRelease>", lambda e: self.event_generate("<<Change>>"), add=True)
-        self.bind("<MouseWheel>", lambda e: self.event_generate("<<Change>>"), add=True)
-
-        # Primer pintado
-        self._do_highlight()
+        self._build_ui()
+    def _on_canvas_configure(self, event=None):
+        self._canvas.itemconfig(self._canvas_window, width=event.width)
 
     def _on_key_release(self, event=None):
         """Maneja el evento de soltar tecla - highlight rapido."""
