@@ -283,7 +283,7 @@ class EditorApp(tk.Tk):
                     if k.upper() == key.upper():
                         return str(v)
                 return ""
-            key_values = [str(self.record.get(k, "")) for k in self.key_columns]
+            key_values = [_get_record_val(self.record, k) for k in self.key_columns]
             
             try:
                 print("DEBUG key_columns:", self.key_columns)
