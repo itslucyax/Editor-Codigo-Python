@@ -130,7 +130,12 @@ class EditorApp(tk.Tk):
 
         #Posicionar el desplegable en el registro actualmente abierto
         if self.key_columns and self.record:
-            current_key = str(self.record.get(self.key_columns[0], "")).strip()
+            first_key = self.key_columns[0] if self.key_columns else ""
+            current_key = ""
+            for k, v in self.record.items():
+                if k.upper() == first_key.upper():
+                    current_key = str(v).strip()
+                    break
             for i, script in enumerate(self.scripts_list):
                 kv = script.get("key_values", [])
                 if kv and str(kv[0]).strip().upper() == current_key.upper():
