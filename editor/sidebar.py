@@ -74,7 +74,7 @@ class Sidebar(tk.Frame):
         self._canvas.bind("<Leave>", lambda e: self._canvas.unbind_all("<MouseWheel>"))
         
         self._build_ui()
-        self.after(100, self._on_frame_configure)
+        self.after(300, self._on_frame_configure)
         
     def _on_frame_configure(self, event=None):
         self._canvas.configure(scrollregion=self._canvas.bbox("all"))
