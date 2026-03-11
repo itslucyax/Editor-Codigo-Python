@@ -74,6 +74,7 @@ class Sidebar(tk.Frame):
         self._canvas.bind("<Leave>", lambda e: self._canvas.unbind_all("<MouseWheel>"))
         
         self._build_ui()
+        self.after(100, self._on_frame_configure)
         
     def _on_frame_configure(self, event=None):
         self._canvas.configure(scrollregion=self._canvas.bbox("all"))
@@ -146,8 +147,7 @@ class Sidebar(tk.Frame):
         tk.Frame(self._inner, bg="#999", height=1).pack(fill="x", pady=10, padx=5)
         self._build_variables_section()
         
-        self._inner.update_idletasks()
-        self._on_frame_configure()
+        # ...existing code...
     
     def _build_key_section(self):
         """
