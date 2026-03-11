@@ -1,4 +1,20 @@
 Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (ultimos-detalles)
+$ git pull origin ultimos-detalles
+remote: Enumerating objects: 5, done.
+remote: Counting objects: 100% (5/5), done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 3 (delta 2), reused 0 (delta 0), pack-reused 0 (from 0)
+Unpacking objects: 100% (3/3), 931 bytes | 66.00 KiB/s, done.
+From https://github.com/itslucyax/Editor-Codigo-Python
+ * branch            ultimos-detalles -> FETCH_HEAD
+   4c5d14e..0d762f4  ultimos-detalles -> origin/ultimos-detalles
+Updating 067f4f7..0d762f4
+error: Your local changes to the following files would be overwritten by merge:
+        editor/app.py
+Please commit your changes or stash them before you merge.
+Aborting
+
+Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (ultimos-detalles)
 $ python3 main.py --connection-string "driver={SQL Server};server=GG\SQL2019;uid=sa;pwd=sa;database=DATO01ABEL A APLICACION P"
 Traceback (most recent call last):
   File "C:\Users\Lucia\Desktop\Editor-Codigo-Python\main.py", line 555, in <module>
@@ -15,3 +31,4 @@ ttr__
            ^^^^^^^^^^^^^^^^^^^^^^
 AttributeError: '_tkinter.tkapp' object has no attribute 'key'
 
+Lucia@b2 MINGW64 ~/Desktop/Editor-Codigo-Python (ultimos-detalles)
