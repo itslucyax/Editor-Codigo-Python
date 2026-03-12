@@ -302,6 +302,11 @@ class EditorApp(tk.Tk):
                 return ""
             key_values = [_get_record_val(self.record, k) for k in self.key_columns]
             
+            print("GUARDANDO EN TABLA:", self.db.table)
+            print("COLUMNAS:", self.key_columns)
+            print("VALORES CLAVE:", key_values)
+            print("CONTENIDO (primeros 50 chars):", campos_editados.get(content_col_real, "")[:50])
+            
             try:
                 ok = self.db.save_record_full(self.key_columns, key_values, campos_editados)
                 if not ok:
@@ -330,6 +335,8 @@ class EditorApp(tk.Tk):
         return "break"
 
     def _on_script_selected(self, index, script_data):
+        print("_on_script_selected llamado, index:", index)
+        print("edit_modified:", self.text_editor.edit_modified())
         """
         Callback cuando se selecciona un script del selector (Combobox).
         Carga el registro completo desde BD (contenido + variables + sidebar).
@@ -347,18 +354,25 @@ class EditorApp(tk.Tk):
         
         # Si hay BD y key_values en el script, recargar registro completo
         new_key_values = script_data.get("key_values")
+        print("new_key_values:", new_key_values)
+        print("script_data:", script_data)
         if self.db and new_key_values and self.key_columns:
             try:
                 # Cargar registro completo desde BD
                 new_record = self.db.get_record_full(self.key_columns, new_key_values)
+                print("RECORD KEYS:", list(new_record.keys()))
+                print("CONTENT_COLUMN:", self.content_column)
                 self.record = new_record
                 
+                print("RECORD KEYS:", list(new_record.keys()))
+                print("CONTENT_COLUMN:", self.content_column)
                 # Actualizar contenido del editor (búsqueda case-insensitive)
                 content = script_data.get("content", "")
                 for k, v in new_record.items():
                     if k.upper() == self.content_column.upper():
                         content = v
                         break
+                print("CONTENT:", content[:50] if content else "VACIO")
                 self.text_editor.set_content(content)
                 self.text_editor.edit_reset()
 
@@ -386,6 +400,7 @@ class EditorApp(tk.Tk):
                 self.title(f"Editor VBS{ctx_label} - {key_display}")
                 
             except Exception as e:
+                print("ERROR EN _on_script_selected:", e)
                 messagebox.showerror("Error al cargar el script", f"No se ha podido cargar el script:\n{e}")
                 return
         else:

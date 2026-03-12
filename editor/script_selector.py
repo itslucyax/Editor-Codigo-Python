@@ -48,7 +48,8 @@ class ScriptSelector(tk.Frame):
             if isinstance(item, dict):
                 normalized.append({
                     "label": item.get("label", f"Script {i}"),
-                    "content": item.get("content", "")
+                    "content": item.get("content", ""),
+                    "key_values": item.get("key_values")
                 })
             elif isinstance(item, (list, tuple)) and len(item) >= 2:
                 normalized.append({
