@@ -363,7 +363,6 @@ class EditorApp(tk.Tk):
                 print("RECORD KEYS:", list(new_record.keys()))
                 print("CONTENT_COLUMN:", self.content_column)
                 self.record = new_record
-                
                 print("RECORD KEYS:", list(new_record.keys()))
                 print("CONTENT_COLUMN:", self.content_column)
                 # Actualizar contenido del editor (búsqueda case-insensitive)
