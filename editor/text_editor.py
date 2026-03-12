@@ -13,6 +13,7 @@ class TextEditor(tk.Text):
     Widget de texto con resaltado para VBS/VB.
     """
     def __init__(self, master, **kwargs):
+        self._user_modified = False
         super().__init__(
             master,
             undo=True,
@@ -30,6 +31,7 @@ class TextEditor(tk.Text):
 
         self.bind("<KeyRelease>", self._on_key_release)
         self.bind("<Key>", self._schedule_highlight_fast)
+        self.bind("<Key>", self._on_user_key, add=True)
         self.bind("<ButtonRelease-1>", self._schedule_highlight)
         self.bind("<<Paste>>", self._do_highlight_now)
         self.bind("<<Cut>>", self._do_highlight_now)
@@ -41,6 +43,10 @@ class TextEditor(tk.Text):
         self.bind("<MouseWheel>", lambda e: self.event_generate("<<Change>>"), add=True)
 
         self._do_highlight()
+
+    def _on_user_key(self, event=None):
+        if event and event.keysym not in ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Left", "Right", "Up", "Down", "Home", "End", "Prior", "Next"):
+            self._user_modified = True
     def _on_canvas_configure(self, event=None):
         self._canvas.itemconfig(self._canvas_window, width=event.width)
 
@@ -76,6 +82,8 @@ class TextEditor(tk.Text):
         self._highlight_after_id = None
         self.highlighter.highlight()
         self.event_generate("<<Change>>")
+        if not self._user_modified:
+            self.edit_modified(False)
 
     def set_content(self, text: str):
         # Strip newlines iniciales/finales que causan desfase en el highlighter

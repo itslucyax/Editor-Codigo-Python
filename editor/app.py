@@ -124,6 +124,7 @@ class EditorApp(tk.Tk):
         # BARRAS SUPERIORES (siempre visibles)
         # ============================================================
 
+        self._initializing = True
         # 4a) Selector de scripts (Combobox "Mostrar SCRIPT")
         self.script_selector = ScriptSelector(
             right_frame,
@@ -149,6 +150,8 @@ class EditorApp(tk.Tk):
                 if kv_upper == current_keys:
                     self.script_selector.combo.current(i)
                     break
+        self._initializing = False
+        # ...existing code...
 
         # 4b) Barra de búsqueda fija (siempre visible)
         self.fixed_search = FixedSearchBar(right_frame)
@@ -164,6 +167,7 @@ class EditorApp(tk.Tk):
 
         # 6) Editor de texto con scrollbar vertical
         self.text_editor = TextEditor(editor_frame)
+        self.text_editor.edit_modified(False)
         self.text_editor.configure(yscrollcommand=self._editor_scrollbar.set) if hasattr(self, '_editor_scrollbar') else None
 
         # Conectar barra de búsqueda fija al editor de texto
@@ -195,6 +199,7 @@ class EditorApp(tk.Tk):
          # Cargar contenido inicial
         self.text_editor.set_content(inicial_text)
         self.text_editor.edit_reset()
+        self.text_editor._user_modified = False
 
         # Atajos de teclado
         self.bind_all("<Control-s>", self._guardar)
@@ -358,6 +363,8 @@ class EditorApp(tk.Tk):
         Carga el registro completo desde BD (contenido + variables + sidebar).
         Si hay cambios sin guardar, pregunta antes de cambiar.
         """
+        if getattr(self, '_initializing', False):
+            return
         if self.text_editor.edit_modified():
             resp = messagebox.askyesnocancel(
                 "Cambios sin guardar",
