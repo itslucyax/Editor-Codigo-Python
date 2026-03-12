@@ -585,7 +585,7 @@ class DatabaseConnection:
         updated = cur.rowcount
         self._cnxn.commit()
         logger.info("save_record_full: %d filas actualizadas", updated)
-        return updated == 1
+        return updated >= 1
 
     # ------------------------------------------------------------------
     # Listado dinámico de scripts (para el desplegable)
