@@ -47,8 +47,6 @@ class TextEditor(tk.Text):
     def _on_user_key(self, event=None):
         if event and event.keysym not in ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Left", "Right", "Up", "Down", "Home", "End", "Prior", "Next"):
             self._user_modified = True
-    def _on_canvas_configure(self, event=None):
-        self._canvas.itemconfig(self._canvas_window, width=event.width)
 
     def _on_key_release(self, event=None):
         """Maneja el evento de soltar tecla - highlight rapido."""

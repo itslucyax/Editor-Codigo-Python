@@ -365,7 +365,7 @@ class EditorApp(tk.Tk):
         """
         if getattr(self, '_initializing', False):
             return
-        if self.text_editor.edit_modified():
+        if self.text_editor._user_modified:
             resp = messagebox.askyesnocancel(
                 "Cambios sin guardar",
                 "Existen cambios sin guardar.\n¿Desea guardarlos antes de cambiar de script?"
@@ -416,6 +416,7 @@ class EditorApp(tk.Tk):
             
         self.text_editor.edit_reset()
         self.text_editor.edit_modified(False)
+        self.text_editor._user_modified = False
         self._update_status()
 
     def _on_cerrar(self):
@@ -423,7 +424,7 @@ class EditorApp(tk.Tk):
         Maneja el cierre de ventana.
         Si hay cambios sin guardar, pregunta al usuario.
         """
-        if self.text_editor.edit_modified():
+        if self.text_editor._user_modified:
             respuesta = messagebox.askyesnocancel(
                 "Cambios sin guardar",
                 "Existen cambios sin guardar.\n\n¿Desea guardarlos antes de cerrar?"
@@ -434,7 +435,7 @@ class EditorApp(tk.Tk):
             elif respuesta:
                 self._guardar()
                 # Sí después de intentar guardar sigue modificando, hubo un error  - no cerrar
-                if self.text_editor.edit_modified():
+                if self.text_editor._user_modified:
                     return
         
         # Cerrar ventana
