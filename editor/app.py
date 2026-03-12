@@ -317,14 +317,13 @@ class EditorApp(tk.Tk):
                     if valor and "." not in valor:
                         vars_invalidas.append(f"{var_name}: '{valor}'")
             if vars_invalidas:
-                resp = messagebox.askyesno(
+                messagebox.showerror(
                     "Variables con formato incorrecto",
                     f"Las siguientes variables no siguen el formato tabla.campo:\n\n"
                     f"{chr(10).join(vars_invalidas)}\n\n"
-                    f"¿Desea guardar de todos modos?"
+                    f"Corríjalas antes de guardar."
                 )
-                if not resp:
-                    return "break"
+                return "break"
             
             try:
                 ok = self.db.save_record_full(self.key_columns, key_values, campos_editados)
@@ -426,8 +425,10 @@ class EditorApp(tk.Tk):
                 # Cancelar: no cerrar
                 return
             elif respuesta:
-                # Sí: guardar y cerrar
                 self._guardar()
+                # Sí después de intentar guardar sigue modificando, hubo un error  - no cerrar
+                if self.text_editor.edit_modified():
+                    return
         
         # Cerrar ventana
         self.destroy()
