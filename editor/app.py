@@ -353,10 +353,17 @@ class EditorApp(tk.Tk):
                 new_record = self.db.get_record_full(self.key_columns, new_key_values)
                 self.record = new_record
                 
-                # Actualizar contenido del editor
-                content = new_record.get(self.content_column, script_data.get("content", ""))
+                # Actualizar contenido del editor (búsqueda case-insensitive)
+                content = script_data.get("content", "")
+                for k, v in new_record.items():
+                    if k.upper() == self.content_column.upper():
+                        content = v
+                        break
                 self.text_editor.set_content(content)
                 self.text_editor.edit_reset()
+
+                # Posicionar desplegable en el script seleccionado
+                self.script_selector.combo.current(index)
                 
                 # Reconstruir sidebar con los nuevos datos
                 self.sidebar.destroy()
