@@ -51,7 +51,7 @@ class TextEditor(tk.Text):
 
     def _on_key_release(self, event=None):
         """Maneja el evento de soltar tecla - highlight rapido."""
-        # Teclas que cambian contenido significativamente
+        #Teclas que cambian contenido significativamente
         if event and event.keysym in ('BackSpace', 'Delete', 'Return', 'quotedbl', 'apostrophe'):
             self._do_highlight_now()
         else:

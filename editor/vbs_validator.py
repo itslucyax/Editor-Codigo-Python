@@ -3,7 +3,7 @@
 Validador de sintaxis VBScript/VB.
 
 Comprueba errores comunes antes de guardar:
-- Script vacío
+- Script vacio
 - Bloques sin cerrar (Sub/End Sub, Function/End Function, If/End If, etc.)
 - Paréntesis desbalanceados
 - Comillas sin cerrar en una línea
@@ -14,8 +14,8 @@ import re
 from typing import List, Tuple
 
 
-# Pares de apertura/cierre en VBScript (case-insensitive)
-# Cada tupla: (regex_apertura, regex_cierre, nombre_legible)
+#Pares de apertura/cierre en VBScript (case-insensitive)
+#Cada tupla: (regex_apertura, regex_cierre, nombre_legible)
 BLOCK_PAIRS = [
     (r"^\s*Sub\b",               r"^\s*End\s+Sub\b",        "Sub / End Sub"),
     (r"^\s*Function\b",          r"^\s*End\s+Function\b",   "Function / End Function"),
@@ -42,22 +42,22 @@ def _strip_comments(line: str) -> str:
 
 
 def _is_comment_line(line: str) -> bool:
-    """Comprueba si una línea es enteramente un comentario."""
+    """Comprueba si una linea es enteramente un comentario."""
     stripped = line.strip()
     return stripped.startswith("'") or stripped.upper().startswith("REM ")
 
 
 def validate_vbs(code: str) -> List[Tuple[str, str, int]]:
     """
-    Valida código VBScript y devuelve una lista de problemas encontrados.
+    Valida codigo VBScript y devuelve una lista de problemas encontrados.
     
     Cada problema es una tupla: (nivel, mensaje, línea)
-      - nivel: "error" | "aviso"
-      - mensaje: Descripción del problema
-      - línea: Número de línea (1-based), 0 si es global
+      -nivel: "error" | "aviso"
+      -mensaje: Descripción del problema
+      -linea: Número de línea (1-based), 0 si es global
     
     Returns:
-        Lista de problemas encontrados (vacía si todo está bien).
+        Lista de problemas encontrados (vacia si todo esta bien).
     """
     problemas: List[Tuple[str, str, int]] = []
     
@@ -67,16 +67,16 @@ def validate_vbs(code: str) -> List[Tuple[str, str, int]]:
     
     lines = code.splitlines()
     
-    # 1) Comprobar bloques abiertos/cerrados
+    #1)Comprobar bloques abiertos/cerrados
     _check_blocks(lines, problemas)
     
-    # 2) Comprobar comillas sin cerrar
+    #2)Comprobar comillas sin cerrar
     _check_quotes(lines, problemas)
     
-    # 3) Comprobar paréntesis desbalanceados
+    #3)Comprobar parentesis desbalanceados
     _check_parentheses(lines, problemas)
     
-    # 4) Comprobar líneas muy largas
+    #4) Comprobar lineas muy largas
     _check_long_lines(lines, problemas)
     
     return problemas
@@ -134,7 +134,7 @@ def _check_quotes(lines: List[str], problemas: List):
         
         clean = _strip_comments(line)
         
-        # Contar comillas dobles — si es impar, hay una sin cerrar
+        #Contar comillas dobles — si es impar, hay una sin cerrar
         count = clean.count('"')
         if count % 2 != 0:
             problemas.append((
@@ -154,7 +154,7 @@ def _check_parentheses(lines: List[str], problemas: List):
         
         clean = _strip_comments(line)
         
-        # Excluir contenido dentro de strings
+        #Excluir contenido dentro de strings
         in_string = False
         line_balance = 0
         for ch in clean:
@@ -168,14 +168,14 @@ def _check_parentheses(lines: List[str], problemas: List):
         
         total_open += line_balance
         
-        # Si el balance acumulado es negativo, hay un ) de más
+        #Si el balance acumulado es negativo, hay un ) de más
         if total_open < 0:
             problemas.append((
                 "aviso",
                 f"Paréntesis de cierre ')' sin apertura correspondiente",
                 i
             ))
-            total_open = 0  # Reset para no repetir el aviso
+            total_open = 0  #Reset para no repetir el aviso
     
     if total_open > 0:
         problemas.append((
@@ -186,7 +186,7 @@ def _check_parentheses(lines: List[str], problemas: List):
 
 
 def _check_long_lines(lines: List[str], problemas: List, max_length: int = 1000):
-    """Avisa sobre líneas extremadamente largas."""
+    """Avisa sobre lineas extremadamente largas."""
     for i, line in enumerate(lines, start=1):
         if len(line) > max_length:
             problemas.append((
@@ -198,7 +198,7 @@ def _check_long_lines(lines: List[str], problemas: List, max_length: int = 1000)
 
 def format_problemas(problemas: List[Tuple[str, str, int]]) -> str:
     """
-    Formatea la lista de problemas en un texto legible para mostrar en un diálogo.
+    Formatea la lista de problemas en un texto legible para mostrar en un dialogo.
     
     Returns:
         Texto formateado con los problemas.

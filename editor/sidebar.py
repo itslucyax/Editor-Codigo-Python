@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Panel lateral izquierdo del editor - DINÁMICO.
-Muestra todos los campos del registro automáticamente según el esquema de la BD.
+Panel lateral izquierdo del editor - DINAMICO.
+Muestra todos los campos del registro automaticamente segun el esquema de la BD.
 NO hay hardcodeo de nombres de campos.
 """
 import tkinter as tk
@@ -16,7 +16,7 @@ from config import (
 
 class Sidebar(tk.Frame):
     """
-    Panel lateral DINÁMICO que se adapta automáticamente a cualquier estructura de BD.
+    Panel lateral DINAMICO que se adapta automáticamente a cualquier estructura de BD.
     
     Construcción adaptativa:
     1. Detecta qué campos tiene el registro
@@ -31,7 +31,7 @@ class Sidebar(tk.Frame):
         content_column: Nombre de la columna que contiene el script (no se muestra)
         editable_columns: Lista de nombres de columnas editables por el usuario
     """
-    WIDTH = 210  # Ancho fijo del sidebar en píxeles
+    WIDTH = 210  #Ancho fijo del sidebar en pixeles
 
     def __init__(
         self, 
@@ -42,26 +42,26 @@ class Sidebar(tk.Frame):
         editable_columns: list = None
     ):
         super().__init__(master, bg=COLOR_SIDEBAR_BG, width=self.WIDTH)
-        self.pack_propagate(False)  # Mantener ancho fijo
+        self.pack_propagate(False)  #Mantener ancho fijo
         
         self.record = record or {}
         self.key_columns = [c.upper() for c in (key_columns or [])]
         self.content_column = content_column.upper()
         self.editable_columns = [c.upper() for c in (editable_columns or [])]
         
-        # Separar campos en categorías
+        #Separar campos en categorías
         self._categorize_fields()
         
-        # Referencias a widgets para obtener valores editados
+        #Referencias a widgets para obtener valores editados
         self.field_widgets = {}  # {nombre_campo: widget}
         
-        # Canvas para scroll vertical
+        #Canvas para scroll vertical
         self._canvas = tk.Canvas(
             self, bg=COLOR_SIDEBAR_BG, highlightthickness=0
         )
         self._canvas.pack(side="left", fill="both", expand=True)
 
-        # Frame interior donde se construye el contenido
+        #Frame interior donde se construye el contenido
         self._inner = tk.Frame(self._canvas, bg=COLOR_SIDEBAR_BG)
         self._canvas_window = self._canvas.create_window(
             (0, 0), window=self._inner, anchor="nw"
@@ -71,7 +71,7 @@ class Sidebar(tk.Frame):
         self._canvas.bind("<Configure>", self._on_canvas_configure)
         self.bind("<Configure>", lambda e: self.after(50, self._on_frame_configure))
 
-        # Scroll con rueda del ratón solo cuando el cursor está encima
+        #Scroll con rueda del ratón solo cuando el cursor está encima
         self._canvas.bind("<Enter>", lambda e: self._canvas.bind_all("<MouseWheel>", self._on_mousewheel))
         self._canvas.bind("<Leave>", lambda e: self._canvas.unbind_all("<MouseWheel>"))
         

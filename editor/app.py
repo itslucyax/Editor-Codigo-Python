@@ -26,11 +26,11 @@ from editor.vbs_validator import validate_vbs, format_problemas
 
 class EditorApp(tk.Tk):
     """
-    Ventana principal del editor de scripts - DINÁMICA.
+    Ventana principal del editor de scripts - DINAMICA.
     
     Args:
         inicial_text: Contenido inicial del editor
-        db: Conexión a base de datos (DatabaseConnection o None)
+        db: Conexion a base de datos (DatabaseConnection o None)
         record: Diccionario completo con todos los campos del registro
         key_columns: Lista de nombres de columnas que son clave primaria
         content_column: Nombre de la columna que contiene el script
@@ -57,7 +57,7 @@ class EditorApp(tk.Tk):
         self.scripts_list = scripts_list or []
         self.context_type = context_type  # 'documento' | 'plantilla' | None
         
-        # Título de ventana dinámico con contexto
+        #Titulo de ventana dinamico con contexto
         ctx_label = ""
         if self.context_type:
             ctx_label = f" [{self.context_type.capitalize()}]"
@@ -69,7 +69,7 @@ class EditorApp(tk.Tk):
                     if k.upper() == plantilla_key.upper():
                         plantilla_val = str(v).strip()
                         break
-                # Buscar el label completo (ej: "P - Plano") en la lista del desplegable
+                #Buscar el label completo (ej: "P - Plano") en la lista del desplegable
                 for script in (scripts_list or []):
                     kv = script.get("key_values", [])
                     if kv and str(kv[0]).strip().upper() == plantilla_val.upper():
@@ -86,7 +86,7 @@ class EditorApp(tk.Tk):
         self.geometry("1100x650")
         self.minsize(700, 450)
 
-        # Barra de estado inferior (se empaqueta primero para que quede debajo)
+        #Barra de estado inferior (se empaqueta primero para que quede debajo)
         self.status_var = tk.StringVar()
         self.status_bar = tk.Label(
             self, textvariable=self.status_var, bg=COLOR_BARRA_ESTADO_BG,
@@ -94,11 +94,11 @@ class EditorApp(tk.Tk):
         )
         self.status_bar.pack(side="bottom", fill="x")
 
-        # Frame principal
+        #Frame principal
         self.main_frame = tk.Frame(self, bg=COLOR_FONDO)
         self.main_frame.pack(fill="both", expand=True)
 
-        # 1) Sidebar a la izquierda del todo - DINÁMICO
+        #1)Sidebar a la izquierda del todo - DINAMICO
         self.sidebar = Sidebar(
             self.main_frame,
             record=self.record,
@@ -106,17 +106,17 @@ class EditorApp(tk.Tk):
             content_column=self.content_column,
             editable_columns=self.editable_columns
         )
-        # Ocultar sidebar en plantillas
+        #Ocultar sidebar en plantillas
         if self.context_type != "plantilla":
             self.sidebar.pack(side="left", fill="y")
 
         # 2) Separador visual entre sidebar y números de línea
         self.separator = tk.Frame(self.main_frame, width=0, bg=COLOR_SEPARADOR)
-        # Ocultar separador en plantillas
+        #Ocultar separador en plantillas
         if self.context_type != "plantilla":
             self.separator.pack(side="left", fill="y", padx=0)
 
-        # 3) Frame derecho (barras superiores + área de edición)
+        #3)Frame derecho (barras superiores + área de edición)
         right_frame = tk.Frame(self.main_frame, bg=COLOR_FONDO)
         right_frame.pack(side="left", fill="both", expand=True)
 
@@ -125,7 +125,7 @@ class EditorApp(tk.Tk):
         # ============================================================
 
         self._initializing = True
-        # 4a) Selector de scripts (Combobox "Mostrar SCRIPT")
+        #4a) Selector de scripts (Combobox "Mostrar SCRIPT")
         self.script_selector = ScriptSelector(
             right_frame,
             scripts_list=self.scripts_list,
@@ -153,7 +153,7 @@ class EditorApp(tk.Tk):
         self._initializing = False
         # ...existing code...
 
-        # 4b) Barra de búsqueda fija (siempre visible)
+        #4b) Barra de bUsqueda fija (siempre visible)
         self.fixed_search = FixedSearchBar(right_frame)
         self.fixed_search.pack(side="top", fill="x")
 
@@ -161,47 +161,47 @@ class EditorApp(tk.Tk):
         # ÁREA DE EDICIÓN
         # ============================================================
 
-        # 5) Frame del editor (números de línea + editor de texto)
+        #5) Frame del editor (números de línea + editor de texto)
         editor_frame = tk.Frame(right_frame, bg=COLOR_FONDO)
         editor_frame.pack(fill="both", expand=True)
 
-        # 6) Editor de texto con scrollbar vertical
+        #6) Editor de texto con scrollbar vertical
         self.text_editor = TextEditor(editor_frame)
         self.text_editor.edit_modified(False)
         self.text_editor.configure(yscrollcommand=self._editor_scrollbar.set) if hasattr(self, '_editor_scrollbar') else None
 
-        # Conectar barra de búsqueda fija al editor de texto
+        #Conectar barra de búsqueda fija al editor de texto
         self.fixed_search.set_text_widget(self.text_editor)
 
         # Botón guardar en la barra de búsqueda (a la derecha de las flechas)
         self.fixed_search.add_save_button(self._guardar, self.status_var, self._update_status)
 
-        # 7) Scrollbar del editor (se empaqueta primero para que quede a la derecha)
+        #7) Scrollbar del editor (se empaqueta primero para que quede a la derecha)
         self._editor_scrollbar = tk.Scrollbar(editor_frame, orient="vertical", command=self.text_editor.yview)
         self._editor_scrollbar.pack(side="right", fill="y")
         self.text_editor.configure(yscrollcommand=self._editor_scrollbar.set)
 
-        # 8) Números de línea a la izquierda
+        #8) Números de línea a la izquierda
         self.line_numbers = LineNumbers(editor_frame, self.text_editor)
         self.line_numbers.pack(side="left", fill="y")
 
-        # 9) Editor ocupa el resto
+        #9) Editor ocupa el resto
         self.text_editor.pack(side="left", fill="both", expand=True)
 
-        # 10) Barra de búsqueda/reemplazo flotante (Ctrl+H)
+        #10) Barra de búsqueda/reemplazo flotante (Ctrl+H)
         self.search_bar = SearchBar(self.text_editor, self.text_editor)
 
-        # Eventos para actualizar status
+        #Eventos para actualizar status
         self.text_editor.bind("<<Change>>",        self._update_status)
         self.text_editor.bind("<KeyRelease>",      self._update_status)
         self.text_editor.bind("<ButtonRelease-1>", self._update_status)
 
-         # Cargar contenido inicial
+         #Cargar contenido inicial
         self.text_editor.set_content(inicial_text)
         self.text_editor.edit_reset()
         self.text_editor._user_modified = False
 
-        # Atajos de teclado
+        #Atajos de teclado
         self.bind_all("<Control-s>", self._guardar)
         self.bind_all("<Control-a>", self._seleccionar_todo)
         self.bind_all("<Control-z>", self._deshacer)
@@ -212,7 +212,7 @@ class EditorApp(tk.Tk):
         self.bind_all("<F3>", self._buscar_siguiente)
         self.bind_all("<Shift-F3>", self._buscar_anterior)
         
-        # Interceptar cierre de ventana para confirmar si hay cambios
+        #Interceptar cierre de ventana para confirmar si hay cambios
         self.protocol("WM_DELETE_WINDOW", self._on_cerrar)
 
     def _get_origen_label(self) -> str:
@@ -226,7 +226,7 @@ class EditorApp(tk.Tk):
         return f"Local{ctx}"
 
     def _update_status(self, event=None):
-        """Actualiza la barra de estado con posición y estado de modificación."""
+        """Actualiza la barra de estado con posición y estado de modificaciOn."""
         linea, columna = self.text_editor.index("insert").split(".")
         mod = self.text_editor.edit_modified()
         estado = "Modificado" if mod else "Guardado"
@@ -247,14 +247,14 @@ class EditorApp(tk.Tk):
         if not problemas:
             return True
         
-        # Separar errores y avisos
+        #Separar errores y avisos
         errores = [p for p in problemas if p[0] == "error"]
         avisos = [p for p in problemas if p[0] == "aviso"]
         
         resumen = format_problemas(problemas)
         
         if errores:
-            # Hay errores: preguntar si quiere guardar de todos modos
+            #Hay errores: preguntar si quiere guardar de todos modos
             resp = messagebox.askyesno(
                 f"Validación del script — {len(errores)} error(es), {len(avisos)} aviso(s)",
                 f"Se han detectado los siguientes problemas en el script:\n\n"
@@ -263,7 +263,7 @@ class EditorApp(tk.Tk):
             )
             return resp
         else:
-            # Solo avisos: informar y continuar
+            #solo avisos: informar y continuar
             resp = messagebox.askyesno(
                 f"Validación del script — {len(avisos)} aviso(s)",
                 f"Se han detectado los siguientes avisos en el script:\n\n"
@@ -274,24 +274,24 @@ class EditorApp(tk.Tk):
 
     def _guardar(self, event=None):
         """Guarda el script y campos editados en BD si hay conexión."""
-        # Validar script antes de guardar
+        #Validar script antes de guardar
         if not self._validar_script():
             self.status_var.set("Guardado cancelado. El script contiene errores.")
             self.after(3000, self._update_status)
             return "break"
         
         if self.db and self.key_columns and self.record:
-            # Obtener contenido del script
+            # btener contenido del script
             contenido = self.text_editor.get("1.0", "end-1c")
             
-            # Obtener campos editados del sidebar
+            #Obtener campos editados del sidebar
             campos_editados = self.sidebar.get_edited_fields()
             
-            # Agregar valores de variables editadas
+            #Agregar valores de variables editadas
             variable_values = self.sidebar.get_variable_values()
             campos_editados.update(variable_values)
             
-            # Agregar contenido del script a los campos actualizados
+            #Agregar contenido del script a los campos actualizados
             #Nombre exacto de columna del record para evitar problemas de capitalización
             content_col_real = self.content_column
             for k in self.record.keys():
@@ -300,7 +300,7 @@ class EditorApp(tk.Tk):
                     break
             campos_editados[content_col_real] = contenido
             
-            # Obtener valores de las claves (busqueda case-sensitive en el record)
+            #Obtener valores de las claves (busqueda case-sensitive en el record)
             def _get_record_val(record, key):
                 if key in record:
                     return str(record[key])
@@ -309,7 +309,7 @@ class EditorApp(tk.Tk):
                         return str(v)
                 return ""
             key_values = [_get_record_val(self.record, k) for k in self.key_columns]
-            # Validar formato de variables (debe ser tabla.campo)
+            #Validar formato de variables (debe ser tabla.campo)
             vars_invalidas = []
             for var_name, widget in self.sidebar.field_widgets.items():
                 upper = var_name.upper()
@@ -350,7 +350,7 @@ class EditorApp(tk.Tk):
             except Exception as e:
                 messagebox.showerror("Error al guardar el registro", str(e))
         else:
-            # Sin conexión BD: guardado simulado
+            #Sin conexión BD: guardado simulado
             self.text_editor.edit_modified(False)
             self.status_var.set("✓ Guardado (local)")
             self.after(1500, self._update_status)
@@ -375,15 +375,15 @@ class EditorApp(tk.Tk):
             elif resp:
                 self._guardar()
         
-        # Si hay BD y key_values en el script, recargar registro completo
+        #Si hay BD y key_values en el script, recargar registro completo
         new_key_values = script_data.get("key_values")
         if self.db and new_key_values and self.key_columns:
             try:
-                # Cargar registro completo desde BD
+                #Cargar registro completo desde BD
                 new_record = self.db.get_record_full(self.key_columns, new_key_values)
                 self.record = new_record
 
-                # Actualizar contenido del editor (búsqueda case-insensitive)
+                #Actualizar contenido del editor (búsqueda case-insensitive)
                 content = script_data.get("content", "")
                 for k, v in new_record.items():
                     if k.upper() == self.content_column.upper():
@@ -392,10 +392,10 @@ class EditorApp(tk.Tk):
                 self.text_editor.set_content(content)
                 self.text_editor.edit_reset()
 
-                # Posicionar desplegable en el script seleccionado
+                #Posicionar desplegable en el script seleccionado
                 self.script_selector.combo.current(index)
 
-                # Reconstruir sidebar con los nuevos datos
+                #Reconstruir sidebar con los nuevos datos
                 self.sidebar.destroy()
                 self.sidebar = Sidebar(
                     self.main_frame,
@@ -404,11 +404,11 @@ class EditorApp(tk.Tk):
                     content_column=self.content_column,
                     editable_columns=self.editable_columns
                 )
-                # Insertar antes del separador (solo si no es plantilla)
+                #Insertar antes del separador (solo si no es plantilla)
                 if self.context_type != "plantilla":
                     self.sidebar.pack(side="left", fill="y", before=self.separator)
 
-                # Actualizar título
+                #Actualizar tItulo
                 ctx_label = ""
                 if self.context_type:
                     ctx_label = f" [{self.context_type.capitalize()}]"
@@ -419,7 +419,7 @@ class EditorApp(tk.Tk):
                 messagebox.showerror("Error al cargar el script", f"No se ha podido cargar el script:\n{e}")
                 return
         else:
-            # Modo local o sin key_values: solo cambiar contenido
+            #Modo local o sin key_values: solo cambiar contenido
             content = script_data.get("content", "")
             self.text_editor.set_content(content)
             self.text_editor.edit_reset()
@@ -448,7 +448,7 @@ class EditorApp(tk.Tk):
                 if self.text_editor._user_modified:
                     return
         
-        # Cerrar ventana
+        #Cerrar ventana
         self.destroy()
 
     def _seleccionar_todo(self, event=None):

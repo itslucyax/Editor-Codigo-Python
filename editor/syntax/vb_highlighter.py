@@ -30,55 +30,55 @@ def _token_to_tag(token) -> str:
     Devuelve el tag Tkinter a usar para un token de Pygments.
     Mapeo completo de tokens para lograr colores estilo VS Code.
     """
-    # Comentarios (verde)
+    #Comentarios (verde)
     if token in Token.Comment:
         return "comment"
     
-    # Palabras clave (azul)
+    #Palabras clave (azul)
     if token in Token.Keyword:
         return "keyword"
     
-    # Cadenas de texto (naranja/salmon)
+    #Cadenas de texto (naranja/salmon)
     if token in Token.Literal.String:
         return "string"
     
-    # Numeros (verde claro)
+    #Numeros (verde claro)
     if token in Token.Literal.Number:
         return "number"
     
-    # Funciones built-in (amarillo)
+    #Funciones built-in (amarillo)
     if token in Token.Name.Builtin:
         return "builtin"
     
-    # Nombres de funciones (amarillo)
+    #Nombres de funciones (amarillo)
     if token in Token.Name.Function:
         return "function"
     
-    # Nombres de clases/tipos (verde turquesa)
+    #Nombres de clases/tipos (verde turquesa)
     if token in Token.Name.Class:
         return "class"
     if token in Token.Name.Type:
         return "class"
     
-    # Variables y otros nombres (azul claro)
+    #Variables y otros nombres (azul claro)
     if token in Token.Name.Variable:
         return "variable"
     if token in Token.Name.Attribute:
         return "variable"
     
-    # Constantes (azul cyan)
+    #Constantes (azul cyan)
     if token in Token.Name.Constant:
         return "constant"
     
-    # Operadores
+    #Operadores
     if token in Token.Operator:
         return "operator"
     
-    # Puntuacion (gris)
+    #Puntuacion (gris)
     if token in Token.Punctuation:
         return "punctuation"
     
-    # Otros nombres (resaltarlos como variables para mejor visual)
+    #Otros nombres (resaltarlos como variables para mejor visual)
     if token in Token.Name:
         return "variable"
     
@@ -91,7 +91,7 @@ class VBHighlighter:
     Configurado con colores estilo VS Code para maxima diferenciacion visual.
     """
     
-    # Lista de todos los tags usados
+    #Lista de todos los tags usados
     TAGS = (
         "keyword", "string", "comment", "number", "builtin", 
         "function", "class", "variable", "constant", 
@@ -102,7 +102,7 @@ class VBHighlighter:
         self.text_widget = text_widget
         self.lexer = VBScriptLexer()
         
-        # Definir los tags de colores con estilo VS Code
+        #Definir los tags de colores con estilo VS Code
         self.text_widget.tag_configure("keyword", foreground=COLOR_KEYWORD)
         self.text_widget.tag_configure("string", foreground=COLOR_STRING)
         self.text_widget.tag_configure("comment", foreground=COLOR_COMMENT, font=(FUENTE_EDITOR[0], FUENTE_EDITOR[1], "italic"))
@@ -125,13 +125,13 @@ class VBHighlighter:
         for tag in self.TAGS:
             self.text_widget.tag_remove(tag, "1.0", "end")
 
-        # Obtener el texto directamente del widget para evitar discrepancias
+        #Obtener el texto directamente del widget para evitar discrepancias
         text = self.text_widget.get("1.0", "end-1c")
         
         if not text:
             return
 
-        # Posicion actual: linea (1-based), columna (0-based)
+        #Posicion actual: linea (1-based), columna (0-based)
         line = 1
         col = 0
 
@@ -141,10 +141,10 @@ class VBHighlighter:
 
             tag = _token_to_tag(token)
             
-            # Calcular posicion inicial
+            #Calcular posicion inicial
             start_index = f"{line}.{col}"
             
-            # Avanzar por el contenido del token
+            #Avanzar por el contenido del token
             for char in content:
                 if char == '\n':
                     line += 1
@@ -152,12 +152,12 @@ class VBHighlighter:
                 else:
                     col += 1
             
-            # Posicion final
+            #Posicion final
             end_index = f"{line}.{col}"
             
             self.text_widget.tag_add(tag, start_index, end_index)
         
-        # Asegurar que los tags de sintaxis tienen prioridad sobre normal
+        #Asegurar que los tags de sintaxis tienen prioridad sobre normal
         for tag in self.TAGS:
             if tag != "normal":
                 self.text_widget.tag_raise(tag, "normal")
