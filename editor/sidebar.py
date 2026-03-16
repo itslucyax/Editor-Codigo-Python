@@ -5,6 +5,7 @@ Muestra todos los campos del registro automáticamente según el esquema de la B
 NO hay hardcodeo de nombres de campos.
 """
 import tkinter as tk
+from tkinter import messagebox
 from config import (
     COLOR_FONDO,
     COLOR_SIDEBAR_BG,
@@ -362,8 +363,21 @@ class Sidebar(tk.Frame):
             borderwidth=1,
         )
         entry.insert(0, value)
+
+        def _validate_var_entry(e, ent=entry, name=display_name):
+            valor = ent.get().strip()
+            if valor and "." not in valor:
+                ent.config(bg="#FFD0D0")
+                messagebox.showwarning(
+                    "Formato incorrecto",
+                    f"{name}: '{valor}' no sigue el formato tabla.campo\n(ej: g_cfactu.FACTURA)"
+                )
+            else:
+                ent.config(bg="#FFFFFF")
+
+        entry.bind("<FocusOut>", _validate_var_entry)
         entry.pack(side="left", fill="x", expand=True)
-        
+
         # Guardar referencia
         self.field_widgets[var_name] = entry
     

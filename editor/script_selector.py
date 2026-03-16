@@ -81,7 +81,7 @@ class ScriptSelector(tk.Frame):
             "Script.TCombobox",
             fieldbackground="#3c3c3c",
             background="#3c3c3c",
-            foreground="#cccccc",
+            foreground="#0e0d0d",
         )
 
         # Combobox
@@ -109,7 +109,7 @@ class ScriptSelector(tk.Frame):
             self,
             text=f"{len(self.scripts)} {unit}",
             bg=COLOR_BARRA_ESTADO_BG,
-            fg="#888888",
+            fg="#C4C3C3",
             font=("Segoe UI", 8),
         )
         self.count_label.pack(side="left")

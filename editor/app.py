@@ -381,10 +381,20 @@ class EditorApp(tk.Tk):
             try:
                 # Cargar registro completo desde BD
                 new_record = self.db.get_record_full(self.key_columns, new_key_values)
+                self.record = new_record
+
+                # Actualizar contenido del editor (búsqueda case-insensitive)
+                content = script_data.get("content", "")
+                for k, v in new_record.items():
+                    if k.upper() == self.content_column.upper():
+                        content = v
+                        break
+                self.text_editor.set_content(content)
+                self.text_editor.edit_reset()
 
                 # Posicionar desplegable en el script seleccionado
                 self.script_selector.combo.current(index)
-                
+
                 # Reconstruir sidebar con los nuevos datos
                 self.sidebar.destroy()
                 self.sidebar = Sidebar(
@@ -397,14 +407,14 @@ class EditorApp(tk.Tk):
                 # Insertar antes del separador (solo si no es plantilla)
                 if self.context_type != "plantilla":
                     self.sidebar.pack(side="left", fill="y", before=self.separator)
-                
+
                 # Actualizar título
                 ctx_label = ""
                 if self.context_type:
                     ctx_label = f" [{self.context_type.capitalize()}]"
                 key_display = " / ".join(str(self.record.get(k, "")) for k in self.key_columns)
                 self.title(f"Editor VBS{ctx_label} - {key_display}")
-                
+
             except Exception as e:
                 messagebox.showerror("Error al cargar el script", f"No se ha podido cargar el script:\n{e}")
                 return
