@@ -26,6 +26,7 @@ class TextEditor(tk.Text):
             **kwargs
         )
 
+        self.configure(blockcursor=False, insertontime=600, insertofftime=300)
         self.highlighter = VBHighlighter(self)
         self._highlight_after_id = None
 
@@ -59,12 +60,12 @@ class TextEditor(tk.Text):
     def _schedule_highlight_fast(self, event=None):
         if self._highlight_after_id is not None:
             self.after_cancel(self._highlight_after_id)
-        self._highlight_after_id = self.after(300, self._do_highlight)
+        self._highlight_after_id = self.after(1500, self._do_highlight)
 
     def _schedule_highlight(self, event=None):
         if self._highlight_after_id is not None:
             self.after_cancel(self._highlight_after_id)
-        self._highlight_after_id = self.after(500, self._do_highlight)
+        self._highlight_after_id = self.after(1500, self._do_highlight)
 
     def _do_highlight_now(self, event=None):
         """Ejecuta el resaltado inmediatamente sin espera."""
@@ -87,3 +88,5 @@ class TextEditor(tk.Text):
         text = text.strip('\n')
         self.delete("1.0", "end")
         self.insert("1.0", text)
+        self._do_highlight()
+        self._user_modified = False
