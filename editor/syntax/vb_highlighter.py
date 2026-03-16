@@ -100,7 +100,6 @@ class VBHighlighter:
     
     def __init__(self, text_widget):
         self.text_widget = text_widget
-        # Usar VBScriptLexer para mejor compatibilidad con código VBS
         self.lexer = VBScriptLexer()
         
         # Definir los tags de colores con estilo VS Code

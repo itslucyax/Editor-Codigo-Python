@@ -57,16 +57,14 @@ class TextEditor(tk.Text):
             self._schedule_highlight_fast()
 
     def _schedule_highlight_fast(self, event=None):
-        """Programa el resaltado con retraso minimo (20ms)."""
         if self._highlight_after_id is not None:
             self.after_cancel(self._highlight_after_id)
-        self._highlight_after_id = self.after(20, self._do_highlight)
+        self._highlight_after_id = self.after(300, self._do_highlight)
 
     def _schedule_highlight(self, event=None):
-        """Programa el resaltado con un pequeno retraso para evitar repintar en cada tecla."""
         if self._highlight_after_id is not None:
             self.after_cancel(self._highlight_after_id)
-        self._highlight_after_id = self.after(50, self._do_highlight)
+        self._highlight_after_id = self.after(500, self._do_highlight)
 
     def _do_highlight_now(self, event=None):
         """Ejecuta el resaltado inmediatamente sin espera."""
@@ -74,6 +72,7 @@ class TextEditor(tk.Text):
             self.after_cancel(self._highlight_after_id)
             self._highlight_after_id = None
         self._do_highlight()
+        self.after(50, self._do_highlight)
 
     def _do_highlight(self):
         """Ejecuta el resaltado ya con el texto estable."""

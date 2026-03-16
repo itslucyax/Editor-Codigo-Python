@@ -368,10 +368,6 @@ class Sidebar(tk.Frame):
             valor = ent.get().strip()
             if valor and "." not in valor:
                 ent.config(bg="#FFD0D0")
-                messagebox.showwarning(
-                    "Formato incorrecto",
-                    f"{name}: '{valor}' no sigue el formato tabla.campo\n(ej: g_cfactu.FACTURA)"
-                )
             else:
                 ent.config(bg="#FFFFFF")
 
