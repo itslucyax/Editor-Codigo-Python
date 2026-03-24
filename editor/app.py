@@ -341,6 +341,7 @@ class EditorApp(tk.Tk):
                     )
                 else:
                     self.text_editor.edit_modified(False)
+                    self.text_editor._user_modified = False
                     self.status_var.set("✓ Los cambios han sido guardados")
                     self.after(1500, self._update_status)
                     messagebox.showinfo(
