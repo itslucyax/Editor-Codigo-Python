@@ -46,6 +46,7 @@ class TextEditor(tk.Text):
         self._do_highlight()
 
     def _on_user_key(self, event=None):
+        print("_on_user_key:", event.keysym if event else "None")
         if event and event.keysym not in ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Left", "Right", "Up", "Down", "Home", "End", "Prior", "Next"):
             self._user_modified = True
 
