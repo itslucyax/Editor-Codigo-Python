@@ -435,6 +435,7 @@ class EditorApp(tk.Tk):
         Maneja el cierre de ventana.
         Si hay cambios sin guardar, pregunta al usuario.
         """
+        print("_user_modified al cerrar: ", self.text_editor._user_modified)
         if self.text_editor._user_modified:
             respuesta = messagebox.askyesnocancel(
                 "Cambios sin guardar",
