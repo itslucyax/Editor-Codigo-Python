@@ -168,6 +168,7 @@ class EditorApp(tk.Tk):
         # 6) Editor de texto con scrollbar vertical
         self.text_editor = TextEditor(editor_frame)
         self.text_editor.edit_modified(False)
+        self.text_editor._user_modified = False
         self.text_editor.configure(yscrollcommand=self._editor_scrollbar.set) if hasattr(self, '_editor_scrollbar') else None
 
         # Conectar barra de búsqueda fija al editor de texto
@@ -331,6 +332,7 @@ class EditorApp(tk.Tk):
                 return "break"
             
             try:
+                print("Intentando guardar...")
                 ok = self.db.save_record_full(self.key_columns, key_values, campos_editados)
                 if not ok:
                     key_display = ", ".join(f"{k}={v}" for k, v in zip(self.key_columns, key_values))
@@ -340,7 +342,8 @@ class EditorApp(tk.Tk):
                         f"Compruebe que exista el registro con {key_display}."
                     )
                 else:
-                    self.text_editor.edit_modified(False)
+                    tk.Text.edit_modified(self.text_editor, False)
+                    self.text_editor._user_modified = False
                     self.text_editor._user_modified = False
                     self.status_var.set("✓ Los cambios han sido guardados")
                     self.after(1500, self._update_status)
@@ -352,7 +355,8 @@ class EditorApp(tk.Tk):
                 messagebox.showerror("Error al guardar el registro", str(e))
         else:
             # Sin conexión BD: guardado simulado
-            self.text_editor.edit_modified(False)
+            tk.Text.edit_modified(self.text_editor, False)
+            self.text_editor._user_modified = False
             self.status_var.set("✓ Guardado (local)")
             self.after(1500, self._update_status)
 
@@ -426,7 +430,8 @@ class EditorApp(tk.Tk):
             self.text_editor.edit_reset()
             
         self.text_editor.edit_reset()
-        self.text_editor.edit_modified(False)
+        tk.Text.edit_modified(self.text_editor, False)
+        self.text_editor._user_modified = False
         self.text_editor._user_modified = False
         self._update_status()
 
@@ -449,7 +454,8 @@ class EditorApp(tk.Tk):
                 # Sí después de intentar guardar sigue modificando, hubo un error  - no cerrar
                 if self.text_editor._user_modified:
                     return
-        
+                self.destroy()
+                return
         # Cerrar ventana
         self.destroy()
 

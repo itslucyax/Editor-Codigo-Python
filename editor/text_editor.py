@@ -32,23 +32,30 @@ class TextEditor(tk.Text):
 
         self.bind("<KeyRelease>", self._on_key_release)
         self.bind("<Key>", self._schedule_highlight_fast)
-        self.bind("<Key>", self._on_user_key, add=True)
+        #self.bind("<BackSpace>", lambda e: [self.__setattr__('_user_modified', True), print("BACKSPACE")] and None, add=True)
+        #self.bind("<Delete>", lambda e: [self.__setattr__('_user_modified', True), print("DELETE")] and None, add=True)
         self.bind("<ButtonRelease-1>", self._schedule_highlight)
         self.bind("<<Paste>>", self._do_highlight_now)
         self.bind("<<Cut>>", self._do_highlight_now)
         self.bind("<<Undo>>", self._do_highlight_now)
         self.bind("<<Redo>>", self._do_highlight_now)
-        self.bind("<<Modified>>", self._schedule_highlight_fast)
+        self.bind("<<Modified>>", self._on_content_modified)
 
         self.bind("<KeyRelease>", lambda e: self.event_generate("<<Change>>"), add=True)
         self.bind("<MouseWheel>", lambda e: self.event_generate("<<Change>>"), add=True)
 
         self._do_highlight()
-
+    """
     def _on_user_key(self, event=None):
-        print("_on_user_key:", event.keysym if event else "None")
-        if event and event.keysym not in ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Left", "Right", "Up", "Down", "Home", "End", "Prior", "Next"):
+        #print("_on_user_key:", event.keysym if event else "None")
+        #if event: #and event.keysym not in ("Shift_L", "Shift_R", "Control_L", "Control_R", "Alt_L", "Alt_R", "Left", "Right", "Up", "Down", "Home", "End", "Prior", "Next"):
+            #self._user_modified = True
+    """
+    def _on_content_modified(self, event=None):
+        """ Se dispara cuando Tkinter detecta cualquier cambio en el contenido."""
+        if tk.Text.edit_modified(self):
             self._user_modified = True
+        self._schedule_highlight_fast()
 
     def _on_key_release(self, event=None):
         """Maneja el evento de soltar tecla - highlight rapido."""
@@ -82,7 +89,9 @@ class TextEditor(tk.Text):
         self.highlighter.highlight()
         self.event_generate("<<Change>>")
         if not self._user_modified:
-            self.edit_modified(False)
+            tk.Text.edit_modified(self, False)
+        #else:
+            #tk.Text.edit_modified(self, False)
 
     def set_content(self, text: str):
         # Strip newlines iniciales/finales que causan desfase en el highlighter
