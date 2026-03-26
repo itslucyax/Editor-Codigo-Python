@@ -921,60 +921,40 @@ class DatabaseConnection:
         logger.debug("Esquema de tabla %s: %d columnas", self.table, len(schema))
         return schema
 
-    def get_record_full(self, key_columns: List[str], key_values: List[str]) -> dict:
+    def get_record_full(self, table_name, key_columns, key_values):
         """
-        Carga un registro completo con TODAS sus columnas de forma dinamica.
-        
-        Args:
-            key_columns: Lista de nombres de columnas que forman la clave (ej: ["MODELO", "CODIGO"])
-            key_values: Lista de valores correspondientes (ej: ["T01", "SCRIPT001"])
-            
-        Returns:
-            Diccionario con {nombre_columna: valor} para todas las columnas del registro
-            
-        Raises:
-            ValueError: Si key_columns y key_values tienen diferente longitud
-            LookupError: Si no se encuentra el registro
+        Recupera el registro de la DB. 
+        Si no existe (nuevo script), devuelve una plantilla vacía.
         """
-        if len(key_columns) != len(key_values):
-            raise ValueError(
-                f"key_columns tiene {len(key_columns)} elementos pero "
-                f"key_values tiene {len(key_values)} elementos"
-            )
-        
-        #Obtener todas las columnas de la tabla
-        schema = self.get_table_schema()
-        all_columns = [col["name"] for col in schema]
-        
-        #Construir SELECT dinamicamente
-        safe_table = self._safe_table()
-        cols_sql = ", ".join(f"[{self._safe_column(col)}]" for col in all_columns)
-        
-        #Construir WHERE dinamicamente
-        where_parts = [f"[{self._safe_column(col)}] = ?" for col in key_columns]
-        where_sql = " AND ".join(where_parts)
-        
-        sql = f"SELECT {cols_sql} FROM [{safe_table}] WHERE {where_sql}"
-        
-        cur = self._cursor()
-        row = cur.execute(sql, *key_values).fetchone()
-        
-        if not row:
-            keys_display = ", ".join(f"{k}='{v}'" for k, v in zip(key_columns, key_values))
-            raise LookupError(f"No existe registro con {keys_display} en tabla {self.table}")
-        
-        # Convertir a diccionario
-        record = {}
-        for i, col_name in enumerate(all_columns):
-            value = row[i]
-            # Normalizar valores None y espacios
-            if value is None:
-                record[col_name] = ""
-            elif isinstance(value, str):
-                record[col_name] = value.strip()
+        try:
+            # Construir la query (esto ya lo tendrás parecido)
+            where_clause = " AND ".join([f"[{col}] = ?" for col in key_columns])
+            sql = f"SELECT * FROM [{table_name}] WHERE {where_clause}"
+            
+            cur = self._cursor()
+            row = cur.execute(sql, key_values).fetchone()
+
+            if row:
+                # CASO A: El script ya existe, lo cargamos normal
+                columns = [column[0] for column in cur.description]
+                return dict(zip(columns, row))
             else:
-                record[col_name] = str(value)
-        
-        logger.info("Registro cargado: %d columnas", len(record))
-        logger.debug("Columnas: %s", list(record.keys()))
-        return record
+                # CASO B: El script es NUEVO (no está en la tabla aún)
+                print(f"DEBUG: Script nuevo detectado ({key_values[-1]}). Generando plantilla.")
+                
+                # Creamos un diccionario con las claves que nos han pasado
+                # para que el editor sepa dónde debe guardarlo después.
+                nueva_plantilla = {}
+                for col, val in zip(key_columns, key_values):
+                    nueva_plantilla[col] = val
+                
+                # Añadimos la columna del cuerpo del script vacía
+                col_contenido = self.content_column or "SCRIPT"
+                nueva_plantilla[col_contenido] = "' Nuevo Script: " + str(key_values[-1]) + "\nSub Main()\n\n\nEnd Sub"
+                
+                return nueva_plantilla
+
+        except Exception as e:
+            print(f"Error crítico en get_record_full: {e}")
+            # Si hay un error real de conexión, devolvemos None para que el app.py gestione el aviso
+            return None

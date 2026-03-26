@@ -25,6 +25,39 @@ from editor.fixed_search_bar import FixedSearchBar
 from editor.vbs_validator import validate_vbs, format_problemas
 
 class EditorApp(tk.Tk):
+
+        def mostrar_resumen_global(self, term, resultados):
+            """
+            Muestra una ventana emergente con la lista de scripts donde aparece el término.
+            'resultados' es una lista de tuplas: (nombre_script, numero_linea)
+            """
+            if hasattr(self, "_win_resumen") and self._win_resumen.winfo_exists():
+                self._win_resumen.destroy()
+
+            self._win_resumen = tk.Toplevel(self)
+            self._win_resumen.title(f"Resultados de: {term}")
+            self._win_resumen.geometry("450x350")
+            self._win_resumen.attributes("-topmost", True)
+
+            tk.Label(self._win_resumen, text=f"Coincidencias para '{term}':", 
+                     font=("Segoe UI", 10, "bold"), pady=10).pack()
+
+            frame = tk.Frame(self._win_resumen)
+            frame.pack(fill="both", expand=True, padx=10, pady=5)
+
+            scrollbar = tk.Scrollbar(frame)
+            scrollbar.pack(side="right", fill="y")
+
+            listbox = tk.Listbox(frame, font=("Consolas", 10), yscrollcommand=scrollbar.set)
+            listbox.pack(side="left", fill="both", expand=True)
+            scrollbar.config(command=listbox.yview)
+
+            for script_name, linea in resultados:
+                item = f" Script: {script_name.ljust(20)} | Línea: {linea}"
+                listbox.insert(tk.END, item)
+
+            tk.Button(self._win_resumen, text="Cerrar", command=self._win_resumen.destroy, 
+                      width=15, bg="#f0f0f0").pack(pady=10)
     """
     Ventana principal del editor de scripts - DINÁMICA.
     
@@ -438,66 +471,28 @@ class EditorApp(tk.Tk):
 
     def _ejecutar_busqueda_global(self, event=None):
         query = self.fixed_search.search_var.get().strip()
-        
         if not query or not self.db:
-            #messagebox.showinfo("Búesqueda", "No hay conexión a DB activa.")
             return
-        #Obtenemso resultados de la DB
-        #1.Buscamos en la BD
         resultados = self.db.search_text_in_document(
             query,
             self.key_columns,
             [self.record.get(k) for k in self.key_columns]
         )
-        codigo_actual = self.record.get(self.key_columns[1]) #Asumiendo que segundo campo es OCDIGO
-        otros = [r for r in resultados if r.get(self.key_columns[1]) != codigo_actual]
+        codigo_actual = self.record.get(self.key_columns[1]) if len(self.key_columns) > 1 else None
+        otros = [r for r in resultados if r.get(self.key_columns[1]) != codigo_actual] if codigo_actual else resultados
         if not otros:
             self.fixed_search.match_label.config(text="Solo en este script")
-            #messagebox.showinfo("Búsqueda Global", f"No se econtró '{texto_a_buscar}' en otros scripts.")
             return
-        # -- VENTANA DE NAVEGACION -- 
-        ventana = tk.Toplevel(self)
-        ventana.title(f"Buscador de {query}")
-        ventana.geometry("350x250")
-        ventana.transient(self) #Se mantiene encima de la app
-        
-        tk.Label(ventana, text=f"'{query}' se usa también en:", font=("Segoe UI", 9, "bold")).pack(pady=5)
-        
-        lb = tk.Listbox(ventana, font=("Consolas", 10), selectmode="single")
-        lb.pack(fill="both", expand=True, padx=10)
-        
+        # Construir lista de tuplas (nombre_script, numero_linea)
+        lista_resultados = []
         for r in otros:
-            lb.insert("fin", r.get(self.key_columns[1], "Sin nombre"))
-            
-        def abrir_seleccionado():
-            if not lb.curselection():
-                return
-            nombre_script = lb.get(lb.curselection())
-            
-            #Buscar en el selector de scripts y cargar
-            for i, s in enumerate(self.script_selector.scripts):
-                if s['label'] == nombre_script:
-                    self.script_selector.combo.current(i)
-                    self.script_selector._on_select() #Carga el script en el editor
-                    self.fixed_search._find_all()     #Resalta la palabra al llegar
-                    ventana.destroy()
-                    break
-        
-        btn = tk.Button(ventana, text="Ir al script", command=abrir_seleccionado, bg="#005fb8", fg="white")
-        
-        #Doble clic para viajar mas rapido
-        lb.bind("<Double-Button-1>", lambda e: abrir_seleccionado())
-        """
-        #2.Mostramos una ventanita simple con los resultados
-        #Aqui se podria usar un simple menu o ventana emergente que permita
-        #seleccionar el script y saltar a el usando self.script_selector.combo.current(idx)
-        msg = f"'{texto_a_buscar}' aparece en:\n\n"
-        for res in coincidencias:
-            #Asumimos que CODIGP identifica al script dentro del doc
-            msg += f"-{res.get('CODIGO', 'Script')}\n"
-        
-        messagebox.showinfo("Resultado Globales", msg)
-        """
+            nombre_script = r.get(self.key_columns[1], "Sin nombre") if len(self.key_columns) > 1 else "Sin nombre"
+            # Buscar línea donde aparece el término
+            contenido = r.get(self.content_column, "")
+            lineas = contenido.splitlines()
+            linea_encontrada = next((i+1 for i, l in enumerate(lineas) if query.lower() in l.lower()), "-")
+            lista_resultados.append((nombre_script, linea_encontrada))
+        self.mostrar_resumen_global(query, lista_resultados)
     def _on_cerrar(self):
         """
         Maneja el cierre de ventana.
