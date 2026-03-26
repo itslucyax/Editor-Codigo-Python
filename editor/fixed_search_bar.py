@@ -190,25 +190,51 @@ class FixedSearchBar(tk.Frame):
 
     def _find_all(self):
         """Encuentra todas las coincidencias."""
-        self._clear_tags()
-        self._matches.clear()
-        self._current_idx = -1
+        self.editor.tag_remove('found', '1.0', 'end')
+        #self._clear_tags()
+        #self._matches.clear()
+        #self._current_idx = -1
 
         query = self.search_var.get()
-        self._last_query = query
+        #self._last_query = query
         if not query:
-            self.match_label.config(text="")
+            #self.match_label.config(text="")
             return
-
+        #Empezamos a buscar desde el principio del documento
         start = "1.0"
+        count = 0
+        
         while True:
-            pos = self.text_widget.search(query, start, stopindex="end", nocase=True)
-            if not pos:
+            idx = self.text_widget.search(query, idx, nocase=True, stopindex='end')
+            if not idx:
                 break
-            end = f"{pos}+{len(query)}c"
-            self.text_widget.tag_add(self._TAG, pos, end)
-            self._matches.append(pos)
-            start = end
+            
+            #AQUI ESTA LA MAGIA PARA IGNORAR COMENTARIOS
+            #idx tiene el formato linea.columna
+            line_num, col_num = idx.split('.')
+            col_num = int(col_num)
+            
+            #Sacamos todo el texto de esta linea en concreto
+            line_text = self.editor.get(f"{line_num}.0", f"{line_num}.end")
+            
+            #Buscamos si hay una comulla simple en esa linea
+            comment_idx = line_text.find("'")
+            #¿Es código válido? 
+            # Sí, si NO hay comilla (-1) o si la palabra está ANTES de la comilla
+            if comment_idx == -1 or col_num < comment_idx:
+                # Calculamos dónde termina la palabra y la resaltamos
+                lastidx = f"{idx}+{len(query)}c"
+                self.editor.tag_add('found', idx, lastidx)
+                count += 1
+                
+            # Avanzamos para seguir buscando el siguiente
+            idx = f"{idx}+{len(query)}c"
+        
+        #Actualizamos el contador de resultados
+        self.match_label.config(text=f"{count} resultados")
+        
+        #Configuramos el color del resaltado
+        self.editor.tag_config('found', background='yellow', foreground='black')
 
         total = len(self._matches)
         if total == 0:
@@ -221,11 +247,11 @@ class FixedSearchBar(tk.Frame):
         self.text_widget.tag_remove(self._TAG_CURRENT, "1.0", "end")
         if not self._matches:
             return
-        pos = self._matches[self._current_idx]
+        idx = self._matches[self._current_idx]
         query = self.search_var.get()
-        end = f"{pos}+{len(query)}c"
-        self.text_widget.tag_add(self._TAG_CURRENT, pos, end)
-        self.text_widget.see(pos)
+        end = f"{idx}+{len(query)}c"
+        self.text_widget.tag_add(self._TAG_CURRENT, idx, end)
+        self.text_widget.see(idx)
         self.match_label.config(
             text=f"{self._current_idx + 1}/{len(self._matches)}"
         )
