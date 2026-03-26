@@ -67,7 +67,7 @@ class FixedSearchBar(tk.Frame):
             self,
             text="",
             bg=COLOR_SIDEBAR_BG,
-            fg="#555555",
+            fg="#333333",
             font=("Segoe UI", 8),
         )
         self.match_label.pack(side="left", padx=(6, 0))
@@ -149,7 +149,7 @@ class FixedSearchBar(tk.Frame):
         self.text_widget = text_widget
         # Configurar tags de resaltado
         self.text_widget.tag_configure(self._TAG, background="#FFFF00", foreground="#000000")
-        self.text_widget.tag_configure(self._TAG_CURRENT, background="#FF8C00", foreground="#FFFFFF")
+        self.text_widget.tag_configure(self._TAG_CURRENT, background="#0078D4", foreground="#FFFFFF")
 
     def find_next(self):
         """Busca la siguiente coincidencia."""
@@ -235,14 +235,27 @@ class FixedSearchBar(tk.Frame):
             # Avanzamos la posición de búsqueda
             search_pos = f"{idx}+{len(query)}c"
         
-        # 3. Actualizamos el contador visual
+        # 3. Forzamos los colores y la prioridad (AQUÍ ESTÁ EL TRUCO)
+        self.text_widget.tag_configure(self._TAG, background="#FFFF00", foreground="#000000")
+        self.text_widget.tag_configure(self._TAG_CURRENT, background="#0078D4", foreground="#FFFFFF")
+        
+        # Subimos los tags al frente para que no los tape el coloreado de código (Sub, If, etc.)
+        self.text_widget.tag_raise(self._TAG)
+        self.text_widget.tag_raise(self._TAG_CURRENT)
+
+        # 4. Actualizamos el contador visual
         total = len(self._matches)
         if total == 0:
             self.match_label.config(text="Sin resultados", fg="red")
         else:
-            # Si es ACUM, lo pusimos azul en _on_global_search_click, 
-            # si no, aquí lo mantenemos visible
-            self.match_label.config(text=f"{total} resultado{'s' if total != 1 else ''}")
+            # Si el término es un ACUM, mantenemos el azul que pusimos en el click global
+            query_up = query.upper()
+            color_label = "#005fb8" if "ACUM" in query_up else "#333333"
+            
+            self.match_label.config(
+                text=f"{total} resultado{'s' if total != 1 else ''}", 
+                fg=color_label
+            )
 
     def _highlight_current(self):
         """Resalta la coincidencia actual de forma diferenciada."""
