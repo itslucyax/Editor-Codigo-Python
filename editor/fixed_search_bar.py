@@ -129,11 +129,20 @@ class FixedSearchBar(tk.Frame):
             self._save_btn.bind("<Enter>", lambda e: status_var.set("Guardar (Ctrl+S)"))
             self._save_btn.bind("<Leave>", lambda e: update_status())
 
-    def _on_global_search_click(self):
-        query = self.search_var.get()
+    def _on_global_search_click(self, event=None):#Event=none: Para que Enter funcione
+        query = self.search_var.get().strip() #upper() par ano fallar con acum o ACUM
         if not query: return
-        #Disparar evento que escucha a la App principal
-        self.event_generate("<<GlobalSearch>>")
+        #Primero resatamos en el script acutual
+        self._find_all()
+        #2.Logica G21: Solo si es ACUM disparamos busqueda en DB
+        if "ACUM" in query.upper():
+            #Ponemos label en azul o negrita para indicar que es busqueda global
+            self.match_label.config(fg="#005fb8", font=("Segoe UI", 9, "bold"))
+            self.event_generate("<<GlobalSearch>>")
+        else:
+            #Si Var0 o cualquier otra cosa dejamos color normla
+            self.match_label.config(fg="black", font=("Segoe UI", 9))
+        
 
     def set_text_widget(self, text_widget: tk.Text):
         """Conecta el widget de texto al buscador (si no se pasó en el constructor)."""

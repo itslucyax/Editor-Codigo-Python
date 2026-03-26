@@ -437,23 +437,57 @@ class EditorApp(tk.Tk):
         self._update_status()
 
     def _ejecutar_busqueda_global(self, event=None):
-        texto_a_buscar = self.fixed_search.search_var.get()
+        query = self.fixed_search.search_var.get().strip()
         
-        if not self.db:
-            messagebox.showinfo("Búesqueda", "No hay conexión a DB activa.")
+        if not query or not self.db:
+            #messagebox.showinfo("Búesqueda", "No hay conexión a DB activa.")
             return
-        
+        #Obtenemso resultados de la DB
         #1.Buscamos en la BD
-        coincidencias = self.db.search_text_in_document(
-            texto_a_buscar,
+        resultados = self.db.search_text_in_document(
+            query,
             self.key_columns,
             [self.record.get(k) for k in self.key_columns]
         )
-        
-        if not coincidencias:
-            messagebox.showinfo("Búsqueda Global", f"No se econtró '{texto_a_buscar}' en otros scripts.")
+        codigo_actual = self.record.get(self.key_columns[1]) #Asumiendo que segundo campo es OCDIGO
+        otros = [r for r in resultados if r.get(self.key_columns[1]) != codigo_actual]
+        if not otros:
+            self.fixed_search.match_label.config(text="Solo en este script")
+            #messagebox.showinfo("Búsqueda Global", f"No se econtró '{texto_a_buscar}' en otros scripts.")
             return
+        # -- VENTANA DE NAVEGACION -- 
+        ventana = tk.Toplevel(self)
+        ventana.title(f"Buscador de {query}")
+        ventana.geometry("350x250")
+        ventana.transient(self) #Se mantiene encima de la app
         
+        tk.Label(ventana, text=f"'{query}' se usa también en:", font=("Segoe UI", 9, "bold")).pack(pady=5)
+        
+        lb = tk.Listbox(ventana, font=("Consolas", 10), selectmode="single")
+        lb.pack(fill="both", expand=True, padx=10)
+        
+        for r in otros:
+            lb.insert("fin", r.get(self.key_columns[1], "Sin nombre"))
+            
+        def abrir_seleccionado():
+            if not lb.curselection():
+                return
+            nombre_script = lb.get(lb.curselection())
+            
+            #Buscar en el selector de scripts y cargar
+            for i, s in enumerate(self.script_selector.scripts):
+                if s['label'] == nombre_script:
+                    self.script_selector.combo.current(i)
+                    self.script_selector._on_select() #Carga el script en el editor
+                    self.fixed_search._find_all()     #Resalta la palabra al llegar
+                    ventana.destroy()
+                    break
+        
+        btn = tk.Button(ventana, text="Ir al script", command=abrir_seleccionado, bg="#005fb8", fg="white")
+        
+        #Doble clic para viajar mas rapido
+        lb.bind("<Double-Button-1>", lambda e: abrir_seleccionado())
+        """
         #2.Mostramos una ventanita simple con los resultados
         #Aqui se podria usar un simple menu o ventana emergente que permita
         #seleccionar el script y saltar a el usando self.script_selector.combo.current(idx)
@@ -463,7 +497,7 @@ class EditorApp(tk.Tk):
             msg += f"-{res.get('CODIGO', 'Script')}\n"
         
         messagebox.showinfo("Resultado Globales", msg)
-
+        """
     def _on_cerrar(self):
         """
         Maneja el cierre de ventana.

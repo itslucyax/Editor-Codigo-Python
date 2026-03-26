@@ -516,29 +516,32 @@ class DatabaseConnection:
         safe_table = self._safe_table()
         #content_col = self._safe_column(self.content_column or "SCRIPT")
         content_col_safe = self._safe_column(content_col_name)
-        
+        doc_col_safe = self._safe_column(key_columns[0])
         #En G21 para buscar en el mismo documento, filtramos por la primera
         #columna de la clave
-        doc_column = self._safe_column(key_columns[0])
-        doc_value = key_values[0]
+        #doc_column = self._safe_column(key_columns[0])
+        #doc_value = key_values[0]
         
-        sql = f"SELECT * FROM [{safe_table}] WHERE [{doc_column}] = ? AND [{content_col_safe}] LIKE ?"
+        sql = f"SELECT * FROM [{safe_table}] WHERE [{doc_col_safe}] = ? AND [{content_col_safe}] LIKE ?"
         
         cur = self._cursor()
         #Ell % es para que busque contiene no es igual a
-        rows = cur.execute(sql, doc_value, f"%{query_text}%").fetchall()
+        rows = cur.execute(sql, key_values, f"%{query_text}%").fetchall()
         
         columns = [column[0] for column in cur.description]
-        raw_results = [dict(zip(columns, row)) for row in rows]
+        candidates = [dict(zip(columns, row)) for row in rows]
 
         #2.FIltra pa ignorar comentarios
         filtered_results = []
         search_term = query_text.lower()
         
-        for res in raw_results:
-            script_content = res.get(content_col_name, "")
-            is_actually_used = False
-            
+        for res in candidates:
+            script_body = res.get(content_col_name, "")
+            if any(search_term in line.split("'")[0].lower() for line in script_body.splitlines()):
+                filtered_results.append(res)
+        return filtered_results
+        """
+            #is_actually_used = False
             for line in script_content.splitlines():
                 #Separamos linea por comillas simple de VBscript
                 #Lo que esta a la izquierda es CODIGO
@@ -553,7 +556,7 @@ class DatabaseConnection:
                 filtered_results.append(res)
             
         return filtered_results
-
+        """
     def _cursor(self) -> pyodbc.Cursor:
         if self._cnxn is None:
             raise RuntimeError("No hay conexión abierta. Llama a connect() primero.")
