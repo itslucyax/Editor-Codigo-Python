@@ -510,7 +510,7 @@ class DatabaseConnection:
             return []
         
         safe_table = self._safe_table()
-        content_col = self._self_column(self.content_column or "SCRIPT")
+        content_col = self._safe_column(self.content_column or "SCRIPT")
         
         #En G21 para buscar en el mismo documento, filtramos por la primera
         #columna de la clave
@@ -523,7 +523,7 @@ class DatabaseConnection:
         #Ell % es para que busque contiene no es igual a
         rows = cur.execute(sql, doc_value, f"%{query_text}%").fetchall()
         
-        colunms = [column[0] for column in cur.description]
+        columns = [column[0] for column in cur.description]
         return [dict(zip(colunms, row)) for row in rows]
 
     def _cursor(self) -> pyodbc.Cursor:
