@@ -526,7 +526,7 @@ class DatabaseConnection:
         
         cur = self._cursor()
         #Ell % es para que busque contiene no es igual a
-        rows = cur.execute(sql, key_values, f"%{query_text}%").fetchall()
+        rows = cur.execute(sql, key_values[0], f"%{query_text}%").fetchall()
         
         columns = [column[0] for column in cur.description]
         candidates = [dict(zip(columns, row)) for row in rows]
