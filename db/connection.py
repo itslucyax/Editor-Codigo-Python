@@ -505,26 +505,54 @@ class DatabaseConnection:
     def search_text_in_document(self, query_text: str, key_columns: list, key_values:list) -> list[dict]:
         """
         Busca una cadena de texto en todos los scripts que pertenecen al mismo documento
+        ignorando las apariciones que esten dentro de comentarios (')
         """
         if not query_text:
             return []
         
+        #1 Def nom columna contenido
+        content_col_name = self.content_column or "SCRIPT"
+        
         safe_table = self._safe_table()
-        content_col = self._safe_column(self.content_column or "SCRIPT")
+        #content_col = self._safe_column(self.content_column or "SCRIPT")
+        content_col_safe = self._safe_column(content_col_name)
         
         #En G21 para buscar en el mismo documento, filtramos por la primera
         #columna de la clave
         doc_column = self._safe_column(key_columns[0])
         doc_value = key_values[0]
         
-        sql = f"SELECT * FROM [{safe_table}] WHERE [{doc_column}] = ? AND [{content_col}] LIKE ?"
+        sql = f"SELECT * FROM [{safe_table}] WHERE [{doc_column}] = ? AND [{content_col_safe}] LIKE ?"
         
         cur = self._cursor()
         #Ell % es para que busque contiene no es igual a
         rows = cur.execute(sql, doc_value, f"%{query_text}%").fetchall()
         
         columns = [column[0] for column in cur.description]
-        return [dict(zip(columns, row)) for row in rows]
+        raw_results = [dict(zip(columns, row)) for row in rows]
+
+        #2.FIltra pa ignorar comentarios
+        filtered_results = []
+        search_term = query_text.lower()
+        
+        for res in raw_results:
+            script_content = res.get(content_col_name, "")
+            is_actually_used = False
+            
+            for line in script_content.splitlines():
+                #Separamos linea por comillas simple de VBscript
+                #Lo que esta a la izquierda es CODIGO
+                #Lo que esta a ala derecha es comentario
+                code_part = line.split("'")[0].lower()
+                
+                if search_term in code_part:
+                    is_actually_used = True
+                    break #Con encontrarlo una vez en el codigo vale
+                
+            if is_actually_used:
+                filtered_results.append(res)
+            
+        return filtered_results
 
     def _cursor(self) -> pyodbc.Cursor:
         if self._cnxn is None:
