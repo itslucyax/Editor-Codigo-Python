@@ -536,11 +536,13 @@ class DatabaseConnection:
         search_term = query_text.lower()
         
         for res in candidates:
-            script_body = res.get(content_col_name, "")
-            if any(search_term in line.split("'")[0].lower() for line in script_body.splitlines()):
-                filtered_results.append(res)
-        return filtered_results
-        """
+            #Obtenemos el cuerpo del script usando el nombre de la columna detectado
+            script_content = res.get(content_col_name, "")
+            is_actually_used = False
+            
+            #if any(search_term in line.split("'")[0].lower() for line in script_body.splitlines()):
+                #filtered_results.append(res)
+        #return filtered_results
             #is_actually_used = False
             for line in script_content.splitlines():
                 #Separamos linea por comillas simple de VBscript
@@ -556,7 +558,7 @@ class DatabaseConnection:
                 filtered_results.append(res)
             
         return filtered_results
-        """
+
     def _cursor(self) -> pyodbc.Cursor:
         if self._cnxn is None:
             raise RuntimeError("No hay conexión abierta. Llama a connect() primero.")
