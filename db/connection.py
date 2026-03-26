@@ -524,7 +524,7 @@ class DatabaseConnection:
         rows = cur.execute(sql, doc_value, f"%{query_text}%").fetchall()
         
         columns = [column[0] for column in cur.description]
-        return [dict(zip(colunms, row)) for row in rows]
+        return [dict(zip(columns, row)) for row in rows]
 
     def _cursor(self) -> pyodbc.Cursor:
         if self._cnxn is None:
