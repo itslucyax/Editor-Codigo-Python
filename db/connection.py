@@ -502,6 +502,30 @@ class DatabaseConnection:
             self._cnxn.close()
             self._cnxn = None
 
+    def search_text_in_document(self, query_text: str, key_columns: list, key_values:list) -> list[dict]:
+        """
+        Busca una cadena de texto en todos los scripts que pertenecen al mismo documento
+        """
+        if not query_text:
+            return []
+        
+        safe_table = self._safe_table()
+        content_col = self._self_column(self.content_column or "SCRIPT")
+        
+        #En G21 para buscar en el mismo documento, filtramos por la primera
+        #columna de la clave
+        doc_column = self._safe_column(key_columns[0])
+        doc_value = key_values[0]
+        
+        sql = f"SELECT * FROM [{safe_table}] WHERE [{doc_column}] = ? AND [{content_col}] LIKE ?"
+        
+        cur = self._cursor()
+        #Ell % es para que busque contiene no es igual a
+        rows = cur.execute(sql, doc_value, f"%{query_text}%").fetchall()
+        
+        colunms = [column[0] for column in cur.description]
+        return [dict(zip(colunms, row)) for row in rows]
+
     def _cursor(self) -> pyodbc.Cursor:
         if self._cnxn is None:
             raise RuntimeError("No hay conexión abierta. Llama a connect() primero.")

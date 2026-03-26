@@ -213,6 +213,7 @@ class EditorApp(tk.Tk):
         self.bind_all("<F3>", self._buscar_siguiente)
         self.bind_all("<Shift-F3>", self._buscar_anterior)
         
+        self.bind("<<GlobalSearch>>", self._ejecutar_busqueda_global)
         # Interceptar cierre de ventana para confirmar si hay cambios
         self.protocol("WM_DELETE_WINDOW", self._on_cerrar)
 
@@ -434,6 +435,34 @@ class EditorApp(tk.Tk):
         self.text_editor._user_modified = False
         self.text_editor._user_modified = False
         self._update_status()
+
+    def _ejecutar_busqueda_global(self, event=None):
+        texto_a_buscar = self.fixed_search.search_var.get()
+        
+        if not self.db:
+            messagebox.showinfo("Búesqueda", "No hay conexión a DB activa.")
+            return
+        
+        #1.Buscamos en la BD
+        coincidencias = self.db.search_text_in_document(
+            texto_a_buscar,
+            self.key_columns,
+            [self.record.get(k) for k in self.key_columns]
+        )
+        
+        if not coincidencias:
+            messagebox.showinfo("Búsqueda Global", f"No se econtró '{texto_a_buscar}' en otros scripts.")
+            return
+        
+        #2.Mostramos una ventanita simple con los resultados
+        #Aqui se podria usar un simple menu o ventana emergente que permita
+        #seleccionar el script y saltar a el usando self.script_selector.combo.current(idx)
+        msg = f"'{texto_a_buscar}' aparece en:\n\n"
+        for res in coincidencias:
+            #Asumimos que CODIGP identifica al script dentro del doc
+            msg += f"-{res.get('CODIGO', 'Script')}\n"
+        
+        messagebox.showinfo("Resultado Globales", msg)
 
     def _on_cerrar(self):
         """

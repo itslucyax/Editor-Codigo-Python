@@ -72,6 +72,14 @@ class FixedSearchBar(tk.Frame):
         )
         self.match_label.pack(side="left", padx=(6, 0))
 
+        self.btn_global = tk.Button(
+            self,
+            text="Buscar en Documento", # O Buscar ACUM
+            command=self._on_global_search_click,
+            bg="#e1e1e1",
+            font=("Segoe UI", 8)
+        )
+        self,self.btn_global.pack(side="left", padx=5)
         # Placeholder para botón guardar (se añade desde app.py)
         self._save_btn = None
 
@@ -120,6 +128,12 @@ class FixedSearchBar(tk.Frame):
         if status_var and update_status:
             self._save_btn.bind("<Enter>", lambda e: status_var.set("Guardar (Ctrl+S)"))
             self._save_btn.bind("<Leave>", lambda e: update_status())
+
+    def _on_global_search_click(self):
+        query = self.search_var.get()
+        if not query: return
+        #Disparar evento que escucha a la App principal
+        self.event_generate("<<GlobalSearch>>")
 
     def set_text_widget(self, text_widget: tk.Text):
         """Conecta el widget de texto al buscador (si no se pasó en el constructor)."""
