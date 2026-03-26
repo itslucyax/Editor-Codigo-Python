@@ -189,57 +189,59 @@ class FixedSearchBar(tk.Frame):
         self._highlight_current()
 
     def _find_all(self):
-        """Encuentra todas las coincidencias."""
-        self.editor.tag_remove('found', '1.0', 'end')
-        #self._clear_tags()
-        #self._matches.clear()
-        #self._current_idx = -1
+        """Encuentra todas las coincidencias ignorando comentarios."""
+        if not self.text_widget:
+            return
+
+        # 1. Limpiamos rastros anteriores usando TUS tags configurados
+        self.text_widget.tag_remove(self._TAG, "1.0", "end")
+        self.text_widget.tag_remove(self._TAG_CURRENT, "1.0", "end")
+        self._matches.clear()
+        self._current_idx = -1
 
         query = self.search_var.get()
-        #self._last_query = query
+        self._last_query = query
+        
         if not query:
-            #self.match_label.config(text="")
+            self.match_label.config(text="")
             return
-        #Empezamos a buscar desde el principio del documento
-        start = "1.0"
-        count = 0
+
+        # 2. Empezamos a buscar desde el principio
+        search_pos = "1.0"
         
         while True:
-            idx = self.text_widget.search(query, idx, nocase=True, stopindex='end')
+            # Buscamos la próxima aparición
+            idx = self.text_widget.search(query, search_pos, nocase=True, stopindex='end')
             if not idx:
                 break
             
-            #AQUI ESTA LA MAGIA PARA IGNORAR COMENTARIOS
-            #idx tiene el formato linea.columna
+            # --- Lógica de comentarios ---
             line_num, col_num = idx.split('.')
             col_num = int(col_num)
             
-            #Sacamos todo el texto de esta linea en concreto
-            line_text = self.editor.get(f"{line_num}.0", f"{line_num}.end")
+            # Obtenemos el texto de la línea actual
+            line_text = self.text_widget.get(f"{line_num}.0", f"{line_num}.end")
             
-            #Buscamos si hay una comulla simple en esa linea
+            # Buscamos la comilla de comentario
             comment_idx = line_text.find("'")
-            #¿Es código válido? 
-            # Sí, si NO hay comilla (-1) o si la palabra está ANTES de la comilla
+            
+            # Si no hay comilla o la palabra está ANTES de la comilla, es válida
             if comment_idx == -1 or col_num < comment_idx:
-                # Calculamos dónde termina la palabra y la resaltamos
-                lastidx = f"{idx}+{len(query)}c"
-                self.editor.tag_add('found', idx, lastidx)
-                count += 1
-                
-            # Avanzamos para seguir buscando el siguiente
-            idx = f"{idx}+{len(query)}c"
+                end_idx = f"{idx}+{len(query)}c"
+                self._matches.append(idx)
+                # Usamos el tag que ya tienes definido en tu clase (_TAG)
+                self.text_widget.tag_add(self._TAG, idx, end_idx)
+            
+            # Avanzamos la posición de búsqueda
+            search_pos = f"{idx}+{len(query)}c"
         
-        #Actualizamos el contador de resultados
-        self.match_label.config(text=f"{count} resultados")
-        
-        #Configuramos el color del resaltado
-        self.editor.tag_config('found', background='yellow', foreground='black')
-
+        # 3. Actualizamos el contador visual
         total = len(self._matches)
         if total == 0:
-            self.match_label.config(text="Sin resultados")
+            self.match_label.config(text="Sin resultados", fg="red")
         else:
+            # Si es ACUM, lo pusimos azul en _on_global_search_click, 
+            # si no, aquí lo mantenemos visible
             self.match_label.config(text=f"{total} resultado{'s' if total != 1 else ''}")
 
     def _highlight_current(self):
