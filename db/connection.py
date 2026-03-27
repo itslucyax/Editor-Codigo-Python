@@ -199,47 +199,46 @@ def parse_connection_string(conn_str: str) -> Dict[str, str]:
         )
 
     # ------------------------------------------------------------------
-    # PARSER PARA GESTIÓN 21 (Documentos y Plantillas)
+    # Detectar formato extendido de Gestión 21
+    # El último token es SIEMPRE el flag: D=Documento, P=Plantilla.
+    #
+    # Formato DOCUMENTO (flag=D, mínimo 4 tokens):
+    #   "datosABEL T01 BOBINADO D"         → db=datosABEL, modelo=T01, codigo=BOBINADO
+    #   Los 3 últimos tokens son: MODELO CODIGO D
+    #   Todo lo anterior es el nombre de la BD.
+    #
+    # Formato PLANTILLA (flag=P, mínimo 3 tokens, puede tener más):
+    #   "dato01ABEL A P"                   → db=dato01ABEL, modelo=A
+    #   "datosABEL O01 APLICACION P"       → db=datosABEL, modelo=O01  (APLICACION se ignora)
+    #   Siempre: primer token=BD, segundo token=MODELO, resto hasta P se ignora.
     # ------------------------------------------------------------------
     db_raw = result.get("database", "")
     tokens = db_raw.split()
-    
-    result["modelo"] = None
-    result["codigo"] = None
-    result["tipo"]   = CONTEXT_DOCUMENTO
-
-    if len(tokens) >= 2:
+    if len(tokens) >= 3:
         flag = tokens[-1].upper()
-        
-        if flag == "D":
-            # Caso: "datosABEL T01 D" o "datosABEL T01 CODIGO D"
-            result["tipo"] = CONTEXT_DOCUMENTO
-            if len(tokens) == 3:
-                # Ejemplo: datosABEL T01 D
+        if flag in _TIPO_FLAG_MAP:
+            if flag == "P":
+                # Plantilla: primer token=BD, segundo token=MODELO, resto ignorado
                 result["database"] = tokens[0]
                 result["modelo"]   = tokens[1]
-            elif len(tokens) >= 4:
-                # Ejemplo: datosABEL T01 BOBINADO D
+                result["codigo"]   = None
+                result["tipo"]     = CONTEXT_PLANTILLA
+                ignored = tokens[2:-1]
+                logger.info(
+                    "Formato plantilla detectado: db=%s, plantilla=%s%s",
+                    result["database"], result["modelo"],
+                    f" (tokens ignorados: {ignored})" if ignored else "",
+                )
+            else:
+                # Documento (flag=D): los 3 últimos son MODELO CODIGO D
                 result["database"] = " ".join(tokens[:-3])
                 result["modelo"]   = tokens[-3]
                 result["codigo"]   = tokens[-2]
-            else:
-                result["database"] = tokens[0]
-
-        elif flag == "P":
-            # Caso: "dato01ABEL A P"
-            result["tipo"] = CONTEXT_PLANTILLA
-            if len(tokens) >= 3:
-                result["database"] = " ".join(tokens[:-2])
-                result["modelo"]   = tokens[-2] # La letra 'A'
-            else:
-                result["database"] = tokens[0]
-        
-        else:
-            # Caso base: no hay flags conocidos
-            result["database"] = db_raw
-
-    return result
+                result["tipo"]     = CONTEXT_DOCUMENTO
+                logger.info(
+                    "Formato documento detectado: db=%s, modelo=%s, codigo=%s",
+                    result["database"], result["modelo"], result["codigo"],
+                )
 
     # Normalizar trust_server_certificate a booleano-string
     if "trust_server_certificate" in result:
@@ -294,6 +293,21 @@ def resolve_table_for_context(
 
 
 class DatabaseConnection:
+
+        def get_record_full(self, key_columns, key_values):
+            """Versión mínima para que main.py no falle"""
+            try:
+                where_clause = " AND ".join([f"[{col}] = ?" for col in key_columns])
+                sql = f"SELECT * FROM [{self.table}] WHERE {where_clause}"
+                cursor = self._cursor()
+                row = cursor.execute(sql, key_values).fetchone()
+                if row:
+                    columns = [column[0] for column in cursor.description]
+                    return dict(zip(columns, row))
+                return None
+            except Exception as e:
+                logger.error(f"Error cargando registro: {e}")
+                return None
     """
     Conecta con SQL Server usando pyodbc y permite leer/guardar scripts.
 
@@ -327,75 +341,10 @@ class DatabaseConnection:
         self.trust_server_certificate = trust_server_certificate
         self.content_column = content_column
         self.context_type = context_type  # 'documento' | 'plantilla' | None
-        self.modelo = modelo              # MODELO extraído de la cadena
-        self.codigo = codigo              # CODIGO extraído de la cadena
+        self.modelo = modelo              # MODELO extraído de la cadena (o None)
+        self.codigo = codigo              # CODIGO extraído de la cadena (o None)
 
         self._cnxn: Optional[pyodbc.Connection] = None
-    def get_record_full(self, key_columns, key_values):
-        """Carga el registro para el editor."""
-        try:
-            where_clause = " AND ".join([f"[{col}] = ?" for col in key_columns])
-            sql = f"SELECT * FROM [{self.table}] WHERE {where_clause}"
-            cur = self._cursor()
-            row = cur.execute(sql, key_values).fetchone()
-            if row:
-                cols = [column[0] for column in cur.description]
-                return dict(zip(cols, row))
-            return None
-        except Exception as e:
-            logger.error(f"Error en get_record_full: {e}")
-            return None
-
-    def rename_script(self, key_columns, key_values, new_name):
-        """Función para el F2."""
-        try:
-            col_id = key_columns[1] if len(key_columns) > 1 else "CODIGO"
-            sql = f"UPDATE [{self.table}] SET [{col_id}] = ? WHERE "
-            sql += " AND ".join([f"[{c}] = ?" for c in key_columns])
-            cur = self._cursor()
-            cur.execute(sql, [new_name] + key_values)
-            self._cnxn.commit()
-            return True
-        except Exception as e:
-            logger.error(f"Error F2: {e}")
-            return False
-
-    def get_acum_fields(self):
-        """Buscador ACUM."""
-        try:
-            cur = self._cursor()
-            rows = cur.execute("SELECT ACUM, DESCRI FROM E_ACUM ORDER BY ACUM").fetchall()
-            return [{"acum": r[0], "descri": r[1]} for r in rows]
-        except:
-            return []
-
-    def parse_connection_string(self, conn_str):
-        result = {}
-        # Trocear la cadena por ';' y '='
-        for part in conn_str.split(';'):
-            if '=' in part:
-                k, v = part.split('=', 1)
-                result[k.strip().lower()] = v.strip()
-
-        db_raw = result.get("database", "")
-        tokens = db_raw.split()
-
-        if len(tokens) >= 2:
-            flag = tokens[-1].upper()
-            if flag == "D":
-                if len(tokens) >= 4:
-                    result["database"] = " ".join(tokens[:-3])
-                    result["modelo"] = tokens[-3]
-                    result["codigo"] = tokens[-2]
-                elif len(tokens) == 3:
-                    result["database"] = tokens[0]
-                    result["modelo"] = tokens[1]
-            elif flag == "P":
-                if len(tokens) >= 3:
-                    result["database"] = " ".join(tokens[:-2])
-                    result["modelo"] = tokens[-2]
-
-        return result
 
     # ------------------------------------------------------------------
     # Context manager: permite usar 'with DatabaseConnection(...) as db:'
@@ -568,63 +517,6 @@ class DatabaseConnection:
             self._cnxn.close()
             self._cnxn = None
 
-    def search_text_in_document(self, query_text: str, key_columns: list, key_values:list) -> list[dict]:
-        """
-        Busca una cadena de texto en todos los scripts que pertenecen al mismo documento
-        ignorando las apariciones que esten dentro de comentarios (')
-        """
-        if not query_text:
-            return []
-        
-        #1 Def nom columna contenido
-        content_col_name = self.content_column or "SCRIPT"
-        
-        safe_table = self._safe_table()
-        #content_col = self._safe_column(self.content_column or "SCRIPT")
-        content_col_safe = self._safe_column(content_col_name)
-        doc_col_safe = self._safe_column(key_columns[0])
-        #En G21 para buscar en el mismo documento, filtramos por la primera
-        #columna de la clave
-        #doc_column = self._safe_column(key_columns[0])
-        #doc_value = key_values[0]
-        
-        sql = f"SELECT * FROM [{safe_table}] WHERE [{doc_col_safe}] = ? AND [{content_col_safe}] LIKE ?"
-        
-        cur = self._cursor()
-        #Ell % es para que busque contiene no es igual a
-        rows = cur.execute(sql, key_values[0], f"%{query_text}%").fetchall()
-        
-        columns = [column[0] for column in cur.description]
-        candidates = [dict(zip(columns, row)) for row in rows]
-
-        #2.FIltra pa ignorar comentarios
-        filtered_results = []
-        search_term = query_text.lower()
-        
-        for res in candidates:
-            #Obtenemos el cuerpo del script usando el nombre de la columna detectado
-            script_content = res.get(content_col_name, "")
-            is_actually_used = False
-            
-            #if any(search_term in line.split("'")[0].lower() for line in script_body.splitlines()):
-                #filtered_results.append(res)
-        #return filtered_results
-            #is_actually_used = False
-            for line in script_content.splitlines():
-                #Separamos linea por comillas simple de VBscript
-                #Lo que esta a la izquierda es CODIGO
-                #Lo que esta a ala derecha es comentario
-                code_part = line.split("'")[0].lower()
-                
-                if search_term in code_part:
-                    is_actually_used = True
-                    break #Con encontrarlo una vez en el codigo vale
-                
-            if is_actually_used:
-                filtered_results.append(res)
-            
-        return filtered_results
-
     def _cursor(self) -> pyodbc.Cursor:
         if self._cnxn is None:
             raise RuntimeError("No hay conexión abierta. Llama a connect() primero.")
@@ -649,8 +541,19 @@ class DatabaseConnection:
         updated_fields: dict
     ) -> bool:
         """
-        Guarda cambios en un registro de forma dinámica.
-        Si el registro no existe (UPDATE afecta a 0 filas), realiza un INSERT.
+        Guarda cambios en un registro de forma dinamia.
+        
+        Args:
+            key_columns: Lista de columnas que forman la clave primaria
+            key_values: Lista de valores correspondientes a las claves
+            updated_fields: Diccionario {columna: nuevo_valor} con los campos a actualizar
+            
+        Returns:
+            True si se actualizó exactamente 1 fila
+            
+        Raises:
+            ValueError: Si las longitudes no coinciden
+            pyodbc.ProgrammingError: Si alguna columna no existe
         """
         if len(key_columns) != len(key_values):
             raise ValueError(
@@ -663,47 +566,41 @@ class DatabaseConnection:
             return True
         
         cur = self._cursor()
+        
+        # Sanitizar todos los nombres de columna antes de construir el SQL
         safe_table = self._safe_table()
         
-        # 1. Intentar hacer UPDATE primero
+        # Construir SET clause (con columnas validadas)
         set_parts = [f"[{self._safe_column(col)}] = ?" for col in updated_fields.keys()]
         set_clause = ", ".join(set_parts)
         
+        # Construir WHERE clause (con columnas validadas)
         where_parts = [f"[{self._safe_column(col)}] = ?" for col in key_columns]
         where_clause = " AND ".join(where_parts)
         
-        update_sql = f"UPDATE [{safe_table}] SET {set_clause} WHERE {where_clause}"
-        update_values = list(updated_fields.values()) + key_values
+        sql = f"UPDATE [{safe_table}] SET {set_clause} WHERE {where_clause}"
+        
+        # Preparar valores para la query
+        values = list(updated_fields.values()) + key_values
+        
+        logger.debug("save_record_full SQL: %s", sql)
+        logger.debug("save_record_full valores: %s", 
+                     {**updated_fields, **dict(zip(key_columns, key_values))})
         
         try:
-            cur.execute(update_sql, *update_values)
+            cur.execute(sql, *values)
         except pyodbc.ProgrammingError as e:
             if "42S22" in str(e):
                 raise LookupError(
-                    f"Una o más columnas no existen en la tabla '{self.table}'."
+                    f"Una o más columnas no existen en la tabla '{self.table}'. "
+                    f"Verifica los nombres de las columnas."
                 ) from e
             raise
         
-        # 2. Comprobar si realmente se actualizó algo
-        if cur.rowcount == 0:
-            # ¡El registro no existía! Hacemos INSERT
-            logger.info("Registro no encontrado. Procediendo con INSERT.")
-            
-            all_cols = list(updated_fields.keys()) + key_columns
-            all_vals = list(updated_fields.values()) + key_values
-            
-            ins_cols = ", ".join(f"[{self._safe_column(c)}]" for c in all_cols)
-            ins_params = ", ".join("?" for _ in all_cols)
-            
-            insert_sql = f"INSERT INTO [{safe_table}] ({ins_cols}) VALUES ({ins_params})"
-            
-            cur.execute(insert_sql, *all_vals)
-            logger.info("save_record_full: Registro nuevo creado (INSERT)")
-        else:
-            logger.info("save_record_full: %d filas actualizadas", cur.rowcount)
-            
+        updated = cur.rowcount
         self._cnxn.commit()
-        return True
+        logger.info("save_record_full: %d filas actualizadas", updated)
+        return updated >= 1
 
     # ------------------------------------------------------------------
     # Listado dinámico de scripts (para el desplegable)
@@ -982,65 +879,60 @@ class DatabaseConnection:
         logger.debug("Esquema de tabla %s: %d columnas", self.table, len(schema))
         return schema
 
-
-    # ------------------------------------------------------------------
-    # NUEVAS FUNCIONES PARA EL EDITOR (Carga, F2 y ACUM)
-    # ------------------------------------------------------------------
-
-    def get_record_full(self, key_columns: List[str], key_values: List[str], columns_to_fetch: Optional[List[str]] = None) -> Optional[dict]:
-        """Carga un registro completo de la base de datos."""
-        try:
-            # Si no hay columnas, traemos todas
-            cols_sql = "*" if not columns_to_fetch else ", ".join([f"[{self._safe_column(c)}]" for c in columns_to_fetch])
+    def get_record_full(self, key_columns: List[str], key_values: List[str]) -> dict:
+        """
+        Carga un registro completo con TODAS sus columnas de forma dinamica.
+        
+        Args:
+            key_columns: Lista de nombres de columnas que forman la clave (ej: ["MODELO", "CODIGO"])
+            key_values: Lista de valores correspondientes (ej: ["T01", "SCRIPT001"])
             
-            where_parts = [f"[{self._safe_column(col)}] = ?" for col in key_columns]
-            where_clause = " AND ".join(where_parts)
+        Returns:
+            Diccionario con {nombre_columna: valor} para todas las columnas del registro
             
-            sql = f"SELECT {cols_sql} FROM [{self._safe_table()}] WHERE {where_clause}"
-            
-            cur = self._cursor()
-            row = cur.execute(sql, key_values).fetchone()
-            
-            if row:
-                columns = [column[0] for column in cur.description]
-                return dict(zip(columns, row))
-            return None
-        except Exception as e:
-            logger.error(f"Error en get_record_full: {e}")
-            return None
-
-    def rename_script(self, key_columns: List[str], key_values: List[str], new_name: str) -> bool:
-        """Cambia el nombre (CODIGO) de un script (Función F2)."""
-        if not self.is_documento:
-            logger.warning("El renonmbrado solo está disponible para Documentos.")
-            return False
-
-        try:
-            # En G_SCRIPT, la columna a cambiar suele ser 'CODIGO' (la segunda en key_columns)
-            col_to_rename = key_columns[1] if len(key_columns) > 1 else "CODIGO"
-            
-            sql = f"UPDATE [{self._safe_table()}] SET [{self._safe_column(col_to_rename)}] = ? WHERE "
-            where_parts = [f"[{self._safe_column(col)}] = ?" for col in key_columns]
-            sql += " AND ".join(where_parts)
-            
-            params = [new_name] + key_values
-            
-            cur = self._cursor()
-            cur.execute(sql, params)
-            self._cnxn.commit()
-            return cur.rowcount > 0
-        except Exception as e:
-            logger.error(f"Error al renombrar script: {e}")
-            return False
-
-    def get_acum_fields(self) -> List[dict]:
-        """Obtiene la lista de campos ACUM de la tabla E_ACUM (Buscador ACUM)."""
-        try:
-            # Intentamos leer de E_ACUM que es el estándar
-            sql = "SELECT ACUM, DESCRI FROM E_ACUM ORDER BY ACUM"
-            cur = self._cursor()
-            rows = cur.execute(sql).fetchall()
-            return [{"acum": r[0].strip(), "descri": r[1].strip() if r[1] else ""} for r in rows]
-        except Exception as e:
-            logger.warning(f"No se pudo acceder a E_ACUM: {e}")
-            return []
+        Raises:
+            ValueError: Si key_columns y key_values tienen diferente longitud
+            LookupError: Si no se encuentra el registro
+        """
+        if len(key_columns) != len(key_values):
+            raise ValueError(
+                f"key_columns tiene {len(key_columns)} elementos pero "
+                f"key_values tiene {len(key_values)} elementos"
+            )
+        
+        #Obtener todas las columnas de la tabla
+        schema = self.get_table_schema()
+        all_columns = [col["name"] for col in schema]
+        
+        #Construir SELECT dinamicamente
+        safe_table = self._safe_table()
+        cols_sql = ", ".join(f"[{self._safe_column(col)}]" for col in all_columns)
+        
+        #Construir WHERE dinamicamente
+        where_parts = [f"[{self._safe_column(col)}] = ?" for col in key_columns]
+        where_sql = " AND ".join(where_parts)
+        
+        sql = f"SELECT {cols_sql} FROM [{safe_table}] WHERE {where_sql}"
+        
+        cur = self._cursor()
+        row = cur.execute(sql, *key_values).fetchone()
+        
+        if not row:
+            keys_display = ", ".join(f"{k}='{v}'" for k, v in zip(key_columns, key_values))
+            raise LookupError(f"No existe registro con {keys_display} en tabla {self.table}")
+        
+        # Convertir a diccionario
+        record = {}
+        for i, col_name in enumerate(all_columns):
+            value = row[i]
+            # Normalizar valores None y espacios
+            if value is None:
+                record[col_name] = ""
+            elif isinstance(value, str):
+                record[col_name] = value.strip()
+            else:
+                record[col_name] = str(value)
+        
+        logger.info("Registro cargado: %d columnas", len(record))
+        logger.debug("Columnas: %s", list(record.keys()))
+        return record

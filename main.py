@@ -482,15 +482,13 @@ O simplemente:
         logger.info("Cargando registro: %s", 
                     ", ".join(f"{k}={v}" for k, v in zip(key_columns, key_values)))
         
-        # Carga el registro usando la nueva función
+        # Llama a la función que acabamos de añadir
         record = db.get_record_full(key_columns, key_values)
 
         if record:
-            logger.info("✓ Registro cargado: %d campos", len(record))
+            logger.info("✓ Registro cargado correctamente")
         else:
-            logger.error("❌ No se encontró el registro en la base de datos.")
-            # Evitamos que pete creando un diccionario vacío o saliendo
-            record = {}
+            logger.warning("⚠️ No se encontró el registro")
         
         # Extraer contenido del script
         content_column = final_config.get("content_column", "SCRIPT")
