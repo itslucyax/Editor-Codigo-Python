@@ -916,25 +916,20 @@ class DatabaseConnection:
         logger.debug("Esquema de tabla %s: %d columnas", self.table, len(schema))
         return schema
 
-    def get_record_full(self, key_columns: List[str], key_values: List[str], columns_to_fetch: List[str]) -> dict:
-        """
-        Recupera el registro de la DB. Si no existe, devuelve un diccionario vacío con las columnas esperadas.
-        """
+    def get_record_full(self, key_columns, key_values, columns_to_fetch):
         try:
-            where_clause = " AND ".join([f"[{col}] = ?" for col in key_columns])
-            cols_sql = ", ".join(f"[{col}]" for col in columns_to_fetch)
-            sql = f"SELECT {cols_sql} FROM [{self._safe_table()}] WHERE {where_clause}"
-            cur = self._cursor()
-            row = cur.execute(sql, key_values).fetchone()
-            if not row:
-                logger.info(f"Registro no encontrado para {key_values}. Creando plantilla vacía.")
-                empty_record = {}
-                for col in columns_to_fetch:
-                    empty_record[col] = ""
-                empty_record[self.content_column] = ""
-                return empty_record
-            # Si existe, devolver el registro normal
-            return dict(zip(columns_to_fetch, row))
+            cols = ", ".join(columns_to_fetch)
+            where_clause = " AND ".join([f"{col} = ?" for col in key_columns])
+            query = f"SELECT {cols} FROM G_SCRIPT WHERE {where_clause}"
+            
+            cursor = self.conn.cursor()
+            cursor.execute(query, key_values)
+            row = cursor.fetchone()
+            
+            if row:
+                columns = [column[0] for column in cursor.description]
+                return dict(zip(columns, row))
+            return None
         except Exception as e:
-            print(f"Error crítico en get_record_full: {e}")
+            logger.error(f"Error en get_record_full: {e}")
             return None

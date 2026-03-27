@@ -482,7 +482,9 @@ O simplemente:
         logger.info("Cargando registro: %s", 
                     ", ".join(f"{k}={v}" for k, v in zip(key_columns, key_values)))
         
-        record = db.get_record_full(key_columns, key_values, ["*"])
+        # Definimos qué columnas queremos traer explícitamente para que no falle el len()
+        cols_a_traer = ["TITULO", "SCRIPT", "MODELO", "CODIGO", "TIPO"] 
+        record = db.get_record_full(key_columns, key_values, cols_a_traer)
         logger.info("✓ Registro cargado: %d campos", len(record))
         
         # Extraer contenido del script
