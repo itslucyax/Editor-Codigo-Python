@@ -199,46 +199,47 @@ def parse_connection_string(conn_str: str) -> Dict[str, str]:
         )
 
     # ------------------------------------------------------------------
-    # Detectar formato extendido de Gestión 21
-    # El último token es SIEMPRE el flag: D=Documento, P=Plantilla.
-    #
-    # Formato DOCUMENTO (flag=D, mínimo 4 tokens):
-    #   "datosABEL T01 BOBINADO D"         → db=datosABEL, modelo=T01, codigo=BOBINADO
-    #   Los 3 últimos tokens son: MODELO CODIGO D
-    #   Todo lo anterior es el nombre de la BD.
-    #
-    # Formato PLANTILLA (flag=P, mínimo 3 tokens, puede tener más):
-    #   "dato01ABEL A P"                   → db=dato01ABEL, modelo=A
-    #   "datosABEL O01 APLICACION P"       → db=datosABEL, modelo=O01  (APLICACION se ignora)
-    #   Siempre: primer token=BD, segundo token=MODELO, resto hasta P se ignora.
+    # PARSER PARA GESTIÓN 21 (Documentos y Plantillas)
     # ------------------------------------------------------------------
     db_raw = result.get("database", "")
     tokens = db_raw.split()
-    if len(tokens) >= 3:
+    
+    result["modelo"] = None
+    result["codigo"] = None
+    result["tipo"]   = CONTEXT_DOCUMENTO
+
+    if len(tokens) >= 2:
         flag = tokens[-1].upper()
-        if flag in _TIPO_FLAG_MAP:
-            if flag == "P":
-                # Plantilla: primer token=BD, segundo token=MODELO, resto ignorado
+        
+        if flag == "D":
+            # Caso: "datosABEL T01 D" o "datosABEL T01 CODIGO D"
+            result["tipo"] = CONTEXT_DOCUMENTO
+            if len(tokens) == 3:
+                # Ejemplo: datosABEL T01 D
                 result["database"] = tokens[0]
                 result["modelo"]   = tokens[1]
-                result["codigo"]   = None
-                result["tipo"]     = CONTEXT_PLANTILLA
-                ignored = tokens[2:-1]
-                logger.info(
-                    "Formato plantilla detectado: db=%s, plantilla=%s%s",
-                    result["database"], result["modelo"],
-                    f" (tokens ignorados: {ignored})" if ignored else "",
-                )
-            else:
-                # Documento (flag=D): los 3 últimos son MODELO CODIGO D
+            elif len(tokens) >= 4:
+                # Ejemplo: datosABEL T01 BOBINADO D
                 result["database"] = " ".join(tokens[:-3])
                 result["modelo"]   = tokens[-3]
                 result["codigo"]   = tokens[-2]
-                result["tipo"]     = CONTEXT_DOCUMENTO
-                logger.info(
-                    "Formato documento detectado: db=%s, modelo=%s, codigo=%s",
-                    result["database"], result["modelo"], result["codigo"],
-                )
+            else:
+                result["database"] = tokens[0]
+
+        elif flag == "P":
+            # Caso: "dato01ABEL A P"
+            result["tipo"] = CONTEXT_PLANTILLA
+            if len(tokens) >= 3:
+                result["database"] = " ".join(tokens[:-2])
+                result["modelo"]   = tokens[-2] # La letra 'A'
+            else:
+                result["database"] = tokens[0]
+        
+        else:
+            # Caso base: no hay flags conocidos
+            result["database"] = db_raw
+
+    return result
 
     # Normalizar trust_server_certificate a booleano-string
     if "trust_server_certificate" in result:
@@ -317,6 +318,7 @@ class DatabaseConnection:
         modelo: Optional[str] = None,
         codigo: Optional[str] = None,
     ):
+        self.conn = None  # <--- AÑADIDO para evitar errores si la conexión falla
         self.server = server
         self.database = database
         self.table = table
@@ -328,7 +330,6 @@ class DatabaseConnection:
         self.context_type = context_type  # 'documento' | 'plantilla' | None
         self.modelo = modelo              # MODELO extraído de la cadena (o None)
         self.codigo = codigo              # CODIGO extraído de la cadena (o None)
-
         self._cnxn: Optional[pyodbc.Connection] = None
 
     # ------------------------------------------------------------------
