@@ -583,19 +583,8 @@ class DatabaseConnection:
         updated_fields: dict
     ) -> bool:
         """
-        Guarda cambios en un registro de forma dinamia.
-        
-        Args:
-            key_columns: Lista de columnas que forman la clave primaria
-            key_values: Lista de valores correspondientes a las claves
-            updated_fields: Diccionario {columna: nuevo_valor} con los campos a actualizar
-            
-        Returns:
-            True si se actualizó exactamente 1 fila
-            
-        Raises:
-            ValueError: Si las longitudes no coinciden
-            pyodbc.ProgrammingError: Si alguna columna no existe
+        Guarda cambios en un registro de forma dinámica.
+        Si el registro no existe (UPDATE afecta a 0 filas), realiza un INSERT.
         """
         if len(key_columns) != len(key_values):
             raise ValueError(
@@ -608,41 +597,47 @@ class DatabaseConnection:
             return True
         
         cur = self._cursor()
-        
-        # Sanitizar todos los nombres de columna antes de construir el SQL
         safe_table = self._safe_table()
         
-        # Construir SET clause (con columnas validadas)
+        # 1. Intentar hacer UPDATE primero
         set_parts = [f"[{self._safe_column(col)}] = ?" for col in updated_fields.keys()]
         set_clause = ", ".join(set_parts)
         
-        # Construir WHERE clause (con columnas validadas)
         where_parts = [f"[{self._safe_column(col)}] = ?" for col in key_columns]
         where_clause = " AND ".join(where_parts)
         
-        sql = f"UPDATE [{safe_table}] SET {set_clause} WHERE {where_clause}"
-        
-        # Preparar valores para la query
-        values = list(updated_fields.values()) + key_values
-        
-        logger.debug("save_record_full SQL: %s", sql)
-        logger.debug("save_record_full valores: %s", 
-                     {**updated_fields, **dict(zip(key_columns, key_values))})
+        update_sql = f"UPDATE [{safe_table}] SET {set_clause} WHERE {where_clause}"
+        update_values = list(updated_fields.values()) + key_values
         
         try:
-            cur.execute(sql, *values)
+            cur.execute(update_sql, *update_values)
         except pyodbc.ProgrammingError as e:
             if "42S22" in str(e):
                 raise LookupError(
-                    f"Una o más columnas no existen en la tabla '{self.table}'. "
-                    f"Verifica los nombres de las columnas."
+                    f"Una o más columnas no existen en la tabla '{self.table}'."
                 ) from e
             raise
         
-        updated = cur.rowcount
+        # 2. Comprobar si realmente se actualizó algo
+        if cur.rowcount == 0:
+            # ¡El registro no existía! Hacemos INSERT
+            logger.info("Registro no encontrado. Procediendo con INSERT.")
+            
+            all_cols = list(updated_fields.keys()) + key_columns
+            all_vals = list(updated_fields.values()) + key_values
+            
+            ins_cols = ", ".join(f"[{self._safe_column(c)}]" for c in all_cols)
+            ins_params = ", ".join("?" for _ in all_cols)
+            
+            insert_sql = f"INSERT INTO [{safe_table}] ({ins_cols}) VALUES ({ins_params})"
+            
+            cur.execute(insert_sql, *all_vals)
+            logger.info("save_record_full: Registro nuevo creado (INSERT)")
+        else:
+            logger.info("save_record_full: %d filas actualizadas", cur.rowcount)
+            
         self._cnxn.commit()
-        logger.info("save_record_full: %d filas actualizadas", updated)
-        return updated >= 1
+        return True
 
     # ------------------------------------------------------------------
     # Listado dinámico de scripts (para el desplegable)
@@ -921,40 +916,25 @@ class DatabaseConnection:
         logger.debug("Esquema de tabla %s: %d columnas", self.table, len(schema))
         return schema
 
-    def get_record_full(self, table_name, key_columns, key_values):
+    def get_record_full(self, key_columns: List[str], key_values: List[str], columns_to_fetch: List[str]) -> dict:
         """
-        Recupera el registro de la DB. 
-        Si no existe (nuevo script), devuelve una plantilla vacía.
+        Recupera el registro de la DB. Si no existe, devuelve un diccionario vacío con las columnas esperadas.
         """
         try:
-            # Construir la query (esto ya lo tendrás parecido)
             where_clause = " AND ".join([f"[{col}] = ?" for col in key_columns])
-            sql = f"SELECT * FROM [{table_name}] WHERE {where_clause}"
-            
+            cols_sql = ", ".join(f"[{col}]" for col in columns_to_fetch)
+            sql = f"SELECT {cols_sql} FROM [{self._safe_table()}] WHERE {where_clause}"
             cur = self._cursor()
             row = cur.execute(sql, key_values).fetchone()
-
-            if row:
-                # CASO A: El script ya existe, lo cargamos normal
-                columns = [column[0] for column in cur.description]
-                return dict(zip(columns, row))
-            else:
-                # CASO B: El script es NUEVO (no está en la tabla aún)
-                print(f"DEBUG: Script nuevo detectado ({key_values[-1]}). Generando plantilla.")
-                
-                # Creamos un diccionario con las claves que nos han pasado
-                # para que el editor sepa dónde debe guardarlo después.
-                nueva_plantilla = {}
-                for col, val in zip(key_columns, key_values):
-                    nueva_plantilla[col] = val
-                
-                # Añadimos la columna del cuerpo del script vacía
-                col_contenido = self.content_column or "SCRIPT"
-                nueva_plantilla[col_contenido] = "' Nuevo Script: " + str(key_values[-1]) + "\nSub Main()\n\n\nEnd Sub"
-                
-                return nueva_plantilla
-
+            if not row:
+                logger.info(f"Registro no encontrado para {key_values}. Creando plantilla vacía.")
+                empty_record = {}
+                for col in columns_to_fetch:
+                    empty_record[col] = ""
+                empty_record[self.content_column] = ""
+                return empty_record
+            # Si existe, devolver el registro normal
+            return dict(zip(columns_to_fetch, row))
         except Exception as e:
             print(f"Error crítico en get_record_full: {e}")
-            # Si hay un error real de conexión, devolvemos None para que el app.py gestione el aviso
             return None
