@@ -941,20 +941,65 @@ class DatabaseConnection:
         logger.debug("Esquema de tabla %s: %d columnas", self.table, len(schema))
         return schema
 
-    def get_record_full(self, key_columns, key_values, columns_to_fetch):
+
+    # ------------------------------------------------------------------
+    # NUEVAS FUNCIONES PARA EL EDITOR (Carga, F2 y ACUM)
+    # ------------------------------------------------------------------
+
+    def get_record_full(self, key_columns: List[str], key_values: List[str], columns_to_fetch: Optional[List[str]] = None) -> Optional[dict]:
+        """Carga un registro completo de la base de datos."""
         try:
-            cols = ", ".join(columns_to_fetch)
-            where_clause = " AND ".join([f"{col} = ?" for col in key_columns])
-            query = f"SELECT {cols} FROM G_SCRIPT WHERE {where_clause}"
+            # Si no hay columnas, traemos todas
+            cols_sql = "*" if not columns_to_fetch else ", ".join([f"[{self._safe_column(c)}]" for c in columns_to_fetch])
             
-            cursor = self.conn.cursor()
-            cursor.execute(query, key_values)
-            row = cursor.fetchone()
+            where_parts = [f"[{self._safe_column(col)}] = ?" for col in key_columns]
+            where_clause = " AND ".join(where_parts)
+            
+            sql = f"SELECT {cols_sql} FROM [{self._safe_table()}] WHERE {where_clause}"
+            
+            cur = self._cursor()
+            row = cur.execute(sql, key_values).fetchone()
             
             if row:
-                columns = [column[0] for column in cursor.description]
+                columns = [column[0] for column in cur.description]
                 return dict(zip(columns, row))
             return None
         except Exception as e:
             logger.error(f"Error en get_record_full: {e}")
             return None
+
+    def rename_script(self, key_columns: List[str], key_values: List[str], new_name: str) -> bool:
+        """Cambia el nombre (CODIGO) de un script (Función F2)."""
+        if not self.is_documento:
+            logger.warning("El renonmbrado solo está disponible para Documentos.")
+            return False
+
+        try:
+            # En G_SCRIPT, la columna a cambiar suele ser 'CODIGO' (la segunda en key_columns)
+            col_to_rename = key_columns[1] if len(key_columns) > 1 else "CODIGO"
+            
+            sql = f"UPDATE [{self._safe_table()}] SET [{self._safe_column(col_to_rename)}] = ? WHERE "
+            where_parts = [f"[{self._safe_column(col)}] = ?" for col in key_columns]
+            sql += " AND ".join(where_parts)
+            
+            params = [new_name] + key_values
+            
+            cur = self._cursor()
+            cur.execute(sql, params)
+            self._cnxn.commit()
+            return cur.rowcount > 0
+        except Exception as e:
+            logger.error(f"Error al renombrar script: {e}")
+            return False
+
+    def get_acum_fields(self) -> List[dict]:
+        """Obtiene la lista de campos ACUM de la tabla E_ACUM (Buscador ACUM)."""
+        try:
+            # Intentamos leer de E_ACUM que es el estándar
+            sql = "SELECT ACUM, DESCRI FROM E_ACUM ORDER BY ACUM"
+            cur = self._cursor()
+            rows = cur.execute(sql).fetchall()
+            return [{"acum": r[0].strip(), "descri": r[1].strip() if r[1] else ""} for r in rows]
+        except Exception as e:
+            logger.warning(f"No se pudo acceder a E_ACUM: {e}")
+            return []
