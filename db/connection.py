@@ -304,33 +304,57 @@ class DatabaseConnection:
     El contexto de trabajo (Plantilla/Documento) determina la tabla automáticamente.
     """
 
-    def __init__(
-        self,
-        server: str,
-        database: str,
-        table: str = "G_SCRIPT",
-        user: Optional[str] = None,
-        password: Optional[str] = None,
-        driver: str = "ODBC Driver 18 for SQL Server",
-        trust_server_certificate: bool = True,
-        content_column: str = "SCRIPT",
-        context_type: Optional[str] = None,
-        modelo: Optional[str] = None,
-        codigo: Optional[str] = None,
-    ):
-        self.conn = None  # <--- AÑADIDO para evitar errores si la conexión falla
-        self.server = server
-        self.database = database
-        self.table = table
-        self.user = user
-        self.password = password
-        self.driver = driver
-        self.trust_server_certificate = trust_server_certificate
-        self.content_column = content_column
-        self.context_type = context_type  # 'documento' | 'plantilla' | None
-        self.modelo = modelo              # MODELO extraído de la cadena (o None)
-        self.codigo = codigo              # CODIGO extraído de la cadena (o None)
-        self._cnxn: Optional[pyodbc.Connection] = None
+    def __init__(self, connection_string):
+        self.conn = None
+        # 1. Analizamos la cadena para extraer los flags de G21
+        params = self.parse_connection_string(connection_string)
+
+        # 2. RECONSTRUIMOS la cadena de conexión para SQL Server
+        clean_conn_str = connection_string
+        if "database=" in connection_string.lower():
+            parts = []
+            for pair in connection_string.split(';'):
+                if '=' in pair:
+                    k, v = pair.split('=', 1)
+                    if k.lower().strip() == 'database':
+                        parts.append(f"{k}={params['database']}")
+                    else:
+                        parts.append(pair)
+            clean_conn_str = ";".join(parts)
+
+        try:
+            logger.info(f"Conectando a BBDD: {params['database']}")
+            self.conn = pyodbc.connect(clean_conn_str)
+        except Exception as e:
+            logger.error(f"Fallo total de conexión: {e}")
+
+    def parse_connection_string(self, conn_str):
+        result = {}
+        # Trocear la cadena por ';' y '='
+        for part in conn_str.split(';'):
+            if '=' in part:
+                k, v = part.split('=', 1)
+                result[k.strip().lower()] = v.strip()
+
+        db_raw = result.get("database", "")
+        tokens = db_raw.split()
+
+        if len(tokens) >= 2:
+            flag = tokens[-1].upper()
+            if flag == "D":
+                if len(tokens) >= 4:
+                    result["database"] = " ".join(tokens[:-3])
+                    result["modelo"] = tokens[-3]
+                    result["codigo"] = tokens[-2]
+                elif len(tokens) == 3:
+                    result["database"] = tokens[0]
+                    result["modelo"] = tokens[1]
+            elif flag == "P":
+                if len(tokens) >= 3:
+                    result["database"] = " ".join(tokens[:-2])
+                    result["modelo"] = tokens[-2]
+
+        return result
 
     # ------------------------------------------------------------------
     # Context manager: permite usar 'with DatabaseConnection(...) as db:'

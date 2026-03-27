@@ -438,6 +438,8 @@ class EditorApp(tk.Tk):
             """
             if getattr(self, '_initializing', False):
                 return
+            if not hasattr(self, 'text_editor') or self.text_editor is None:
+                return
             if self.text_editor._user_modified:
                 resp = messagebox.askyesnocancel(
                     "Cambios sin guardar",
