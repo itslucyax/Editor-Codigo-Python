@@ -304,29 +304,70 @@ class DatabaseConnection:
     El contexto de trabajo (Plantilla/Documento) determina la tabla automáticamente.
     """
 
-    def __init__(self, connection_string):
-        self.conn = None
-        # 1. Analizamos la cadena para extraer los flags de G21
-        params = self.parse_connection_string(connection_string)
+    def __init__(
+        self,
+        server: str,
+        database: str,
+        table: str = "G_SCRIPT",
+        user: Optional[str] = None,
+        password: Optional[str] = None,
+        driver: str = "ODBC Driver 18 for SQL Server",
+        trust_server_certificate: bool = True,
+        content_column: str = "SCRIPT",
+        context_type: Optional[str] = None,
+        modelo: Optional[str] = None,
+        codigo: Optional[str] = None,
+    ):
+        self.server = server
+        self.database = database
+        self.table = table
+        self.user = user
+        self.password = password
+        self.driver = driver
+        self.trust_server_certificate = trust_server_certificate
+        self.content_column = content_column
+        self.context_type = context_type  # 'documento' | 'plantilla' | None
+        self.modelo = modelo              # MODELO extraído de la cadena
+        self.codigo = codigo              # CODIGO extraído de la cadena
 
-        # 2. RECONSTRUIMOS la cadena de conexión para SQL Server
-        clean_conn_str = connection_string
-        if "database=" in connection_string.lower():
-            parts = []
-            for pair in connection_string.split(';'):
-                if '=' in pair:
-                    k, v = pair.split('=', 1)
-                    if k.lower().strip() == 'database':
-                        parts.append(f"{k}={params['database']}")
-                    else:
-                        parts.append(pair)
-            clean_conn_str = ";".join(parts)
-
+        self._cnxn: Optional[pyodbc.Connection] = None
+    def get_record_full(self, key_columns, key_values):
+        """Carga el registro para el editor."""
         try:
-            logger.info(f"Conectando a BBDD: {params['database']}")
-            self.conn = pyodbc.connect(clean_conn_str)
+            where_clause = " AND ".join([f"[{col}] = ?" for col in key_columns])
+            sql = f"SELECT * FROM [{self.table}] WHERE {where_clause}"
+            cur = self._cursor()
+            row = cur.execute(sql, key_values).fetchone()
+            if row:
+                cols = [column[0] for column in cur.description]
+                return dict(zip(cols, row))
+            return None
         except Exception as e:
-            logger.error(f"Fallo total de conexión: {e}")
+            logger.error(f"Error en get_record_full: {e}")
+            return None
+
+    def rename_script(self, key_columns, key_values, new_name):
+        """Función para el F2."""
+        try:
+            col_id = key_columns[1] if len(key_columns) > 1 else "CODIGO"
+            sql = f"UPDATE [{self.table}] SET [{col_id}] = ? WHERE "
+            sql += " AND ".join([f"[{c}] = ?" for c in key_columns])
+            cur = self._cursor()
+            cur.execute(sql, [new_name] + key_values)
+            self._cnxn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error F2: {e}")
+            return False
+
+    def get_acum_fields(self):
+        """Buscador ACUM."""
+        try:
+            cur = self._cursor()
+            rows = cur.execute("SELECT ACUM, DESCRI FROM E_ACUM ORDER BY ACUM").fetchall()
+            return [{"acum": r[0], "descri": r[1]} for r in rows]
+        except:
+            return []
 
     def parse_connection_string(self, conn_str):
         result = {}
